@@ -28,7 +28,7 @@
   --line-2:     #bac6d8;
 
   /* text */
-  --muted:      #61738e;
+  --muted:      #596a83;   /* clears 4.5:1 on paper, tint AND the selected-option ground */
   --muted-2:    #5f6f88;
 
   /* semantic */
@@ -324,7 +324,13 @@ svg{display:block}
   padding:12px 14px;line-height:1.5;
 }
 .composer__field::placeholder{color:#6d84a8}
-.composer__field:focus{border-color:var(--bright);outline:none}
+.composer__field:focus{
+  border-color:var(--bright);
+  /* A hue change on an existing border is colour-only signalling, on the one
+     control a keyboard user must be able to find. Give it a real ring. */
+  outline:2px solid var(--bright);
+  outline-offset:1px;
+}
 .composer__bar{display:flex;align-items:center;gap:10px;margin-top:10px}
 .composer__hint{font-size:.75rem;color:#8fa6c9;flex:1;min-width:0}
 
