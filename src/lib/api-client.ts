@@ -1,0 +1,130 @@
+/* The HTTP layer, and nothing else.
+
+   The surface holds no invariant (ADR-0009): it supplies an Answer Turn and
+   renders what it is given. Three things this client deliberately cannot do:
+     - compute a score, a band or a posterior. Those arrive decided.
+     - decide what to ask next. Topic selection lives in the graph.
+     - hold an Answer Key. There is no route that would return one. */
+
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code: string | null;
+  readonly data: unknown;
+
+  constructor(status: number, message: string, data: unknown, code: string | null = null) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+    this.data = data;
+  }
+
+  /* A timeout is a park, not an error: recovery reads the Session and resumes,
+     the same path an interruption uses. */
+  get isRecoverable(): boolean {
+    return this.status === 408 || this.status === 504 || this.status >= 500;
+  }
+}
+
+export interface RequestOptions {
+  method?: "GET" | "POST" | "DELETE" | "PATCH";
+  body?: unknown;
+  headers?: Record<string, string>;
+  signal?: AbortSignal;
+}
+
+interface ApiClient {
+  request: <T>(path: string, options?: RequestOptions) => Promise<T>;
+  upload: <T>(path: string, form: FormData, signal?: AbortSignal) => Promise<T>;
+}
+
+function messageOf(data: unknown, fallback: string): string {
+  if (data && typeof data === "object") {
+    const record = data as Record<string, unknown>;
+    /* Failure copy renders from the API's own `code` and `message`. Composing
+       it here is what would let a Credit message reach a BYOK Candidate. */
+    if (typeof record.message === "string") return record.message;
+    if (typeof record.detail === "string") return record.detail;
+  }
+  return fallback;
+}
+
+function codeOf(data: unknown): string | null {
+  if (data && typeof data === "object") {
+    const code = (data as Record<string, unknown>).code;
+    if (typeof code === "string") return code;
+  }
+  return null;
+}
+
+async function parse(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return { detail: text };
+  }
+}
+
+export interface ClientOptions {
+  credentials?: RequestCredentials;
+}
+
+export function createApiClient(baseUrl: string, options: ClientOptions = {}): ApiClient {
+  const credentials = options.credentials ?? "same-origin";
+
+  async function settle<T>(response: Response, fallback: string): Promise<T> {
+    const data = await parse(response);
+    if (!response.ok) {
+      throw new ApiError(response.status, messageOf(data, fallback), data, codeOf(data));
+    }
+    return data as T;
+  }
+
+  return {
+    async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+      const { method = "GET", body, headers, signal } = options;
+      const response = await fetch(baseUrl + path, {
+        method,
+        signal,
+        credentials,
+        headers: { "content-type": "application/json", ...headers },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      return settle<T>(response, `${response.status} ${response.statusText}`);
+    },
+
+    /* A PDF is a file. Sending it through the JSON helper would mean base64,
+       which doubles a 20 MB upload for nothing. */
+    async upload<T>(path: string, form: FormData, signal?: AbortSignal): Promise<T> {
+      const response = await fetch(baseUrl + path, {
+        method: "POST", body: form, signal, credentials,
+      });
+      return settle<T>(response, `${response.status} ${response.statusText}`);
+    },
+  };
+}
+
+/* Same origin unless told otherwise.
+
+   SPEC-0000 §7 chose same-origin and this file needed no configuration for it:
+   the API mounts `dist/` at `/`, and Vite proxies `/v1` in dev. Hosting the
+   surface separately reverses that (ADR-0020), and `VITE_API_URL` is how — it
+   is baked in at build time, so a surface always knows which API it was built
+   against rather than discovering it at runtime.
+
+   `credentials` follows from the same decision: a cross-origin request does not
+   carry cookies unless it says so, and a same-origin one does not need to. */
+const configured = import.meta.env.VITE_API_URL?.replace(/\/$/, "") ?? "";
+
+export const api = createApiClient(`${configured}/v1`, {
+  credentials: configured ? "include" : "same-origin",
+});
+
+/* One idempotency key per composed answer, reused on every retry. A mashed
+   submit button, a flaky network and a browser refresh all converge on one
+   Answer Turn — which is why ADR-0011 chose a request over a socket. */
+export function turnKey(sessionId: string, turnIndex: number): string {
+  return `${sessionId}:${turnIndex}`;
+}

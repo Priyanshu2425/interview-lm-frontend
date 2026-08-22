@@ -1,0 +1,189 @@
+/* ============================================================================
+   shell.css — the app frame.
+
+   One responsive shell, not two builds. Above 1080px it is the working surface
+   from the desktop designs: a persistent left rail and an optional right panel.
+   Below it, the rail becomes a drawer and the panel stacks under the stage —
+   which is exactly what the mobile designs do, expressed once.
+   ========================================================================= */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--w-rail) minmax(0, 1fr);
+  min-height: 100dvh;
+}
+
+.rail {
+  display: grid; align-content: start; gap: var(--s-7);
+  grid-template-rows: auto auto 1fr auto;
+  padding: var(--s-6) var(--s-5);
+  background: var(--surface);
+  border-right: var(--bw-hair) solid var(--border);
+  position: sticky; top: 0; height: 100dvh; overflow-y: auto;
+}
+.rail .brand { padding-inline: var(--s-5); }
+.rail-foot { display: grid; gap: var(--s-5); }
+
+.main { display: flex; flex-direction: column; min-width: 0; }
+
+/* -- the working surface: stage plus an optional right panel --------------- */
+
+.workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--w-panel);
+  flex: 1;
+}
+.workbench--solo { grid-template-columns: minmax(0, 1fr); }
+
+.workbench-main {
+  padding: var(--s-9) var(--s-9) var(--s-13);
+  min-width: 0;
+}
+.workbench-main--narrow { max-width: 880px; }
+.workbench-stage { max-width: 760px; margin-inline: auto; width: 100%; }
+
+.workbench-side {
+  display: grid; gap: var(--s-7); align-content: start;
+  padding: var(--s-7);
+  background: var(--surface);
+  border-left: var(--bw-hair) solid var(--border);
+  position: sticky; top: var(--h-topbar);
+  height: calc(100dvh - var(--h-topbar));
+  overflow-y: auto;
+}
+
+@media (max-width: 1240px) {
+  :root { --w-panel: 306px; }
+}
+
+@media (max-width: 1080px) {
+  .workbench { grid-template-columns: minmax(0, 1fr); }
+  .workbench-side {
+    position: static; height: auto; overflow: visible;
+    border-left: 0; border-top: var(--bw-hair) solid var(--border);
+  }
+  .workbench-main { padding: var(--s-8) var(--s-7) var(--s-11); }
+}
+
+/* -- mobile: the rail becomes a drawer ------------------------------------ */
+
+@media (max-width: 900px) {
+  .shell { grid-template-columns: minmax(0, 1fr); }
+
+  .rail {
+    position: fixed; inset: 0 auto 0 0; z-index: var(--z-drawer);
+    width: min(300px, 86vw); height: 100dvh;
+    border-right: var(--bw-hair) solid var(--border-2);
+    box-shadow: var(--shadow-3);
+    translate: -102% 0;
+    visibility: hidden;
+    transition: translate var(--d-4) var(--e-out), visibility var(--d-4);
+    padding-top: max(var(--s-6), env(safe-area-inset-top));
+  }
+  .shell[data-drawer="open"] .rail { translate: 0 0; visibility: visible; }
+
+  .rail-close { display: inline-flex; }
+
+  .workbench-main { padding: var(--s-7) var(--s-6) var(--s-11); }
+  .workbench-side { padding: var(--s-6); margin-top: var(--s-7); }
+  .workbench-stage { max-width: none; }
+}
+
+.drawer-toggle {
+  display: inline-grid; place-items: center; flex: none;
+  width: var(--h-control-lg); height: var(--h-control-lg);
+  margin-left: calc(var(--s-4) * -1);
+  border: 0; border-radius: var(--r-sm); background: none; color: var(--fg-2);
+  cursor: pointer;
+  transition: background var(--d-1) var(--e-out);
+}
+.drawer-toggle:hover { background: var(--surface-2); color: var(--fg); }
+.drawer-toggle svg { width: 20px; height: 20px; }
+
+/* The drawer control only exists where there is a drawer. Declared after the
+   base rule so it actually wins. */
+@media (min-width: 901px) {
+  .rail-close, .drawer-toggle { display: none; }
+}
+
+.drawer-backdrop {
+  position: fixed; inset: 0; z-index: calc(var(--z-drawer) - 1);
+  background: oklch(0 0 0 / 0.5);
+  animation: fade var(--d-3) var(--e-out);
+}
+
+/* -- topbar contents ------------------------------------------------------ */
+
+.topbar-title {
+  display: grid; min-width: 0;
+}
+.topbar-title strong {
+  font-family: var(--font-display); font-weight: var(--display-weight);
+  letter-spacing: var(--display-ls); font-size: var(--t-18);
+  color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* On a phone the topbar has room for the title and two controls, and the
+   title is the one thing that must not be sacrificed. The eyebrow, the
+   subtitle and the Visit dots are all repeated in the page body below. */
+@media (max-width: 720px) {
+  .topbar { padding: var(--s-4) var(--s-5); gap: var(--s-4); min-height: 52px; }
+  .topbar > .caption { display: none; }
+  .topbar .eyebrow { display: none; }
+  .topbar .visits { display: none; }
+  .topbar-title { flex: 1 1 auto; }
+  .topbar-title strong { font-size: var(--t-16); }
+  .topbar .timer { font-size: var(--t-11); white-space: nowrap; }
+}
+
+/* Room for the save bar to sit over, so the last control on the page is never
+   permanently underneath it. */
+.workbench-main:has(.actionbar) { padding-bottom: calc(var(--s-13) + 72px); }
+
+/* Sticky bottom bar for save/cancel on configuration surfaces. */
+.actionbar {
+  position: sticky; bottom: 0; z-index: var(--z-sticky);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s-6); flex-wrap: wrap;
+  margin-top: var(--s-9);
+  padding: var(--s-5) var(--s-7);
+  padding-bottom: max(var(--s-5), env(safe-area-inset-bottom));
+  background: color-mix(in oklch, var(--surface) 92%, transparent);
+  backdrop-filter: blur(14px);
+  border: var(--bw-hair) solid var(--border-2);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-2);
+}
+
+/* -- the crossing ---------------------------------------------------------
+   The design's one thesis-carrying motion: moving between the examination and
+   the scaffolding around it morphs the ground rather than swapping a panel.
+   Everything else is 110–260ms state feedback. */
+
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root) { animation: cross-out var(--d-3) var(--e-out) both; }
+  ::view-transition-new(root) { animation: cross-in var(--d-3) var(--e-out) both; }
+}
+@keyframes cross-out { to { opacity: 0; filter: blur(3px); } }
+@keyframes cross-in { from { opacity: 0; filter: blur(3px); } }
+
+/* The composer belongs at the foot of the stage, not floating a third of the
+   way down it when a Visit has only asked one question. */
+.workbench-stage:has(.composer) {
+  display: flex; flex-direction: column;
+  min-height: calc(100dvh - var(--h-topbar) - var(--s-9) - var(--s-13));
+}
+.workbench-stage .composer { margin-top: auto; }
+@media (max-width: 1080px) {
+  .workbench-stage:has(.composer) {
+    min-height: calc(100dvh - var(--h-topbar) - var(--s-8) - var(--s-11));
+  }
+}
+
+/* The label above the swatches rather than beside them: five 28px targets and
+   a word do not fit across a 232px rail, and clipping the fifth variation is
+   worse than a second line. */
+.rail-variation {
+  display: grid; gap: var(--s-3); justify-items: start;
+  padding-top: var(--s-5);
+}

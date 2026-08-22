@@ -1,16 +1,28 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="graphite">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Start a Session — Cortex Interviewer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>InterviewLM</title>
+<meta name="description" content="Examine what you can actually explain. Coverage and Mastery, reported separately — an unasked Topic is never a low score.">
+<meta name="color-scheme" content="dark light">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@400;500;600&family=Inter:wght@400;500;600&display=swap">
+<script>
+/* Paint the stored variation before first paint. Without this the app flashes
+   Graphite for one frame on every load for anyone who chose Paper. */
+(function () {
+  try {
+    var t = localStorage.getItem("ilm.theme.v1");
+    if (t && /^(graphite|paper|clinical|signal|dusk)$/.test(t))
+      document.documentElement.setAttribute("data-theme", t);
+  } catch (e) { /* private mode: the default is correct */ }
+})();
+</script>
 </head>
 <body>
-<div class="app" id="app"></div>
-<script type="module" src="/assets/setup.js"></script>
+<div id="root"></div>
+<script type="module" src="/src/main.tsx"></script>
 </body>
 </html>

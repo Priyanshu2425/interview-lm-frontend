@@ -1,0 +1,388 @@
+/* ============================================================================
+   tokens.css — three layers.
+
+   1. The invariant scale. Type steps, space, radius, edge, motion, layout
+      widths and z-order. It never changes between variations.
+   2. Five palette variations, each scoped to its own `data-theme`. Adding a
+      sixth costs exactly one block.
+   3. Product semantics (--m-*, --floor-*, --judge-*, --cite-*) DERIVED from
+      whichever palette is active. A Beta plot in Dusk and a Beta plot in
+      Clinical encode the same fact with different pigment, and neither ever
+      needs a hardcoded hue.
+
+   Reconstructed from the design system's markup: every token name below is one
+   the shipped screens reference.
+   ========================================================================= */
+
+:root {
+  /* ---- type scale · exact steps ---------------------------------------- */
+  --t-64: 4rem;        /* 64 · display-1 */
+  --t-48: 3rem;        /* 48 · display-2 */
+  --t-38: 2.375rem;    /* 38 · display-3 */
+  --t-30: 1.875rem;    /* 30 · h1 */
+  --t-24: 1.5rem;      /* 24 · h2 */
+  --t-20: 1.25rem;     /* 20 · h3 */
+  --t-18: 1.125rem;    /* 18 · body-lg, h4 */
+  --t-16: 1rem;        /* 16 · the examiner's question */
+  --t-14: 0.875rem;    /* 14 · body, default */
+  --t-13: 0.8125rem;   /* 13 · controls, table */
+  --t-12: 0.75rem;     /* 12 · caption, label */
+  --t-11: 0.6875rem;   /* 11 · eyebrow, mono metadata */
+
+  /* Body never below 13px in app surfaces; 12 and 11 are for mono metadata,
+     captions and labels only. */
+
+  --lh-tight: 1.14;
+  --lh-snug: 1.32;
+  --lh-body: 1.62;
+  --lh-loose: 1.85;
+
+  --w-regular: 400;
+  --w-medium: 500;
+  --w-semi: 600;
+  --w-bold: 700;
+
+  --ls-caps: 0.09em;
+  --ls-mono: 0.01em;
+  --ls-tight: -0.02em;
+
+  /* ---- space · 4px base, 15 steps -------------------------------------- */
+  --s-1: 2px;
+  --s-2: 4px;
+  --s-3: 6px;
+  --s-4: 8px;
+  --s-5: 12px;
+  --s-6: 16px;
+  --s-7: 20px;
+  --s-8: 24px;
+  --s-9: 32px;
+  --s-10: 40px;
+  --s-11: 56px;
+  --s-12: 72px;
+  --s-13: 96px;
+  --s-14: 128px;
+  --s-15: 160px;
+  /* Component padding uses 4–8. Section rhythm uses 9–13. Nothing between. */
+
+  /* ---- radius & edge --------------------------------------------------- */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+  --r-full: 999px;
+
+  --bw-hair: 1px;
+  --bw-thick: 2px;
+
+  /* ---- motion ---------------------------------------------------------- */
+  --d-1: 110ms;   /* state feedback: hover, focus, press */
+  --d-2: 170ms;   /* small position changes, tab underline */
+  --d-3: 260ms;   /* entering surfaces: dialog, popover, drawer */
+  --d-4: 420ms;   /* the drawer sweep on mobile */
+  --d-5: 700ms;   /* score reveal only. A Visit resolves once. */
+  --e-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --e-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* ---- layout ---------------------------------------------------------- */
+  --h-topbar: 56px;
+  --h-control-sm: 28px;
+  --h-control: 36px;
+  --h-control-lg: 44px;   /* touch target floor */
+  --w-rail: 232px;
+  --w-panel: 348px;
+  --w-wrap: 1320px;
+  --w-prose: 68ch;
+
+  /* ---- z-order --------------------------------------------------------- */
+  --z-sticky: 20;
+  --z-drawer: 40;
+  --z-scrim: 45;
+  --z-dialog: 50;
+  --z-toast: 60;
+}
+
+/* ==========================================================================
+   VARIATION 01 · GRAPHITE — the examination room
+   Near-black, one cyan accent. The default: a long text-first session read at a
+   desk, and the ground that the confidence ramp was tuned against.
+   ========================================================================= */
+:root,
+[data-theme="graphite"] {
+  --bg:         oklch(0.170 0.006 265);
+  --surface:    oklch(0.205 0.007 265);
+  --surface-2:  oklch(0.252 0.009 265);
+  --surface-3:  oklch(0.300 0.010 265);
+
+  --fg:         oklch(0.962 0.003 265);
+  --fg-2:       oklch(0.840 0.006 265);
+  --muted:      oklch(0.672 0.012 265);
+  --faint:      oklch(0.580 0.012 265);
+
+  --border:     oklch(0.270 0.009 265);
+  --border-2:   oklch(0.310 0.010 265);
+
+  --accent:      oklch(0.800 0.150 190);
+  --accent-hov:  oklch(0.865 0.140 190);
+  --accent-soft: oklch(0.800 0.150 190 / 0.14);
+  --accent-line: oklch(0.800 0.150 190 / 0.42);
+  --on-accent:   oklch(0.180 0.024 190);
+
+  --risk: oklch(0.680 0.190 24);
+  --warn: oklch(0.812 0.148 78);
+  --ok:   oklch(0.770 0.135 158);
+
+  --focus: oklch(0.800 0.150 190);
+
+  --judge-bg:   oklch(0.228 0 0);
+  --judge-line: oklch(0.330 0 0);
+  --judge-fg:   oklch(0.900 0 0);
+
+  --shadow-a: 0.42;
+  --shadow-b: 0.32;
+
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --font-body:    "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --display-weight: 600;
+  --display-ls: -0.03em;
+
+  color-scheme: dark;
+}
+
+/* ==========================================================================
+   VARIATION 02 · PAPER — the filed record
+   Warm off-white, deep ink blue, a serif display. For reading an Evidence
+   ledger in daylight next to the course material.
+   ========================================================================= */
+[data-theme="paper"] {
+  --bg:         oklch(0.972 0.006 85);
+  --surface:    oklch(0.995 0.003 85);
+  --surface-2:  oklch(0.948 0.008 85);
+  --surface-3:  oklch(0.912 0.010 85);
+
+  --fg:         oklch(0.228 0.015 265);
+  --fg-2:       oklch(0.372 0.014 265);
+  --muted:      oklch(0.470 0.014 265);
+  --faint:      oklch(0.560 0.012 265);
+
+  --border:     oklch(0.895 0.008 85);
+  --border-2:   oklch(0.842 0.010 85);
+
+  --accent:      oklch(0.470 0.192 262);
+  --accent-hov:  oklch(0.398 0.190 262);
+  --accent-soft: oklch(0.470 0.192 262 / 0.10);
+  --accent-line: oklch(0.470 0.192 262 / 0.38);
+  --on-accent:   oklch(0.990 0.006 262);
+
+  --risk: oklch(0.512 0.208 27);
+  --warn: oklch(0.560 0.140 68);
+  --ok:   oklch(0.500 0.128 158);
+
+  --focus: oklch(0.470 0.192 262);
+
+  --judge-bg:   oklch(0.945 0 0);
+  --judge-line: oklch(0.858 0 0);
+  --judge-fg:   oklch(0.260 0 0);
+
+  --shadow-a: 0.13;
+  --shadow-b: 0.09;
+
+  --font-display: "Instrument Serif", Georgia, serif;
+  --font-body:    "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono:    "IBM Plex Mono", ui-monospace, monospace;
+  --display-weight: 400;
+  --display-ls: -0.012em;
+
+  color-scheme: light;
+}
+
+/* ==========================================================================
+   VARIATION 03 · CLINICAL — the audit surface
+   Cool paper, desaturated teal, geometric display. Built for the Evidence table
+   and the Operator console, where nothing should look persuasive.
+   ========================================================================= */
+[data-theme="clinical"] {
+  --bg:         oklch(0.978 0.002 235);
+  --surface:    oklch(0.997 0.001 235);
+  --surface-2:  oklch(0.956 0.003 235);
+  --surface-3:  oklch(0.922 0.004 235);
+
+  --fg:         oklch(0.212 0.008 235);
+  --fg-2:       oklch(0.360 0.008 235);
+  --muted:      oklch(0.462 0.008 235);
+  --faint:      oklch(0.556 0.006 235);
+
+  --border:     oklch(0.902 0.004 235);
+  --border-2:   oklch(0.850 0.005 235);
+
+  --accent:      oklch(0.532 0.118 196);
+  --accent-hov:  oklch(0.458 0.116 196);
+  --accent-soft: oklch(0.532 0.118 196 / 0.11);
+  --accent-line: oklch(0.532 0.118 196 / 0.40);
+  --on-accent:   oklch(0.992 0.008 196);
+
+  --risk: oklch(0.505 0.206 27);
+  --warn: oklch(0.552 0.136 66);
+  --ok:   oklch(0.492 0.124 158);
+
+  --focus: oklch(0.532 0.118 196);
+
+  --judge-bg:   oklch(0.950 0 0);
+  --judge-line: oklch(0.862 0 0);
+  --judge-fg:   oklch(0.250 0 0);
+
+  --shadow-a: 0.12;
+  --shadow-b: 0.08;
+
+  --font-display: "Sora", system-ui, sans-serif;
+  --font-body:    "Inter", system-ui, sans-serif;
+  --font-mono:    "IBM Plex Mono", ui-monospace, monospace;
+  --display-weight: 600;
+  --display-ls: -0.022em;
+
+  color-scheme: light;
+}
+
+/* ==========================================================================
+   VARIATION 04 · SIGNAL — engineering
+   Black-green ground, a lime accent that only ever lands twice on a screen.
+   Mono display, because on this variation the numerals are the subject.
+   ========================================================================= */
+[data-theme="signal"] {
+  --bg:         oklch(0.155 0.004 150);
+  --surface:    oklch(0.190 0.005 150);
+  --surface-2:  oklch(0.238 0.006 150);
+  --surface-3:  oklch(0.288 0.007 150);
+
+  --fg:         oklch(0.958 0.004 150);
+  --fg-2:       oklch(0.836 0.006 150);
+  --muted:      oklch(0.668 0.010 150);
+  --faint:      oklch(0.578 0.010 150);
+
+  --border:     oklch(0.258 0.006 150);
+  --border-2:   oklch(0.302 0.008 150);
+
+  --accent:      oklch(0.900 0.190 122);
+  --accent-hov:  oklch(0.945 0.175 122);
+  --accent-soft: oklch(0.900 0.190 122 / 0.13);
+  --accent-line: oklch(0.900 0.190 122 / 0.40);
+  --on-accent:   oklch(0.180 0.045 122);
+
+  --risk: oklch(0.688 0.196 24);
+  --warn: oklch(0.822 0.146 80);
+  --ok:   oklch(0.782 0.130 160);
+
+  --focus: oklch(0.900 0.190 122);
+
+  --judge-bg:   oklch(0.222 0 0);
+  --judge-line: oklch(0.322 0 0);
+  --judge-fg:   oklch(0.898 0 0);
+
+  --shadow-a: 0.46;
+  --shadow-b: 0.34;
+
+  --font-display: "JetBrains Mono", ui-monospace, monospace;
+  --font-body:    "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, monospace;
+  --display-weight: 700;
+  --display-ls: -0.035em;
+
+  color-scheme: dark;
+}
+
+/* ==========================================================================
+   VARIATION 05 · DUSK — the long session
+   Warm dark, amber accent, low glare. For the hour after the light goes.
+   ========================================================================= */
+[data-theme="dusk"] {
+  --bg:         oklch(0.178 0.012 55);
+  --surface:    oklch(0.214 0.014 55);
+  --surface-2:  oklch(0.262 0.016 55);
+  --surface-3:  oklch(0.312 0.018 55);
+
+  --fg:         oklch(0.950 0.010 70);
+  --fg-2:       oklch(0.828 0.014 65);
+  --muted:      oklch(0.672 0.018 60);
+  --faint:      oklch(0.580 0.018 55);
+
+  --border:     oklch(0.282 0.016 55);
+  --border-2:   oklch(0.326 0.018 55);
+
+  --accent:      oklch(0.822 0.142 72);
+  --accent-hov:  oklch(0.878 0.136 72);
+  --accent-soft: oklch(0.822 0.142 72 / 0.14);
+  --accent-line: oklch(0.822 0.142 72 / 0.42);
+  --on-accent:   oklch(0.202 0.042 72);
+
+  --risk: oklch(0.688 0.192 22);
+  --warn: oklch(0.828 0.140 84);
+  --ok:   oklch(0.772 0.128 158);
+
+  --focus: oklch(0.822 0.142 72);
+
+  --judge-bg:   oklch(0.238 0 0);
+  --judge-line: oklch(0.338 0 0);
+  --judge-fg:   oklch(0.898 0 0);
+
+  --shadow-a: 0.44;
+  --shadow-b: 0.32;
+
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-body:    "Sora", system-ui, sans-serif;
+  --font-mono:    "IBM Plex Mono", ui-monospace, monospace;
+  --display-weight: 500;
+  --display-ls: -0.028em;
+
+  color-scheme: dark;
+}
+
+/* ==========================================================================
+   DERIVED · product semantics
+   Everything below reads off the active palette. No variation redefines any of
+   it, which is why a sixth variation is one block and not a second design.
+   ========================================================================= */
+:root {
+  /* -- the confidence ramp ---------------------------------------------
+     Sequential toward the accent, so higher Mastery reads as more of the
+     brand rather than as a different topic. Only the lowest band borrows the
+     risk hue, which keeps a wall of Topics calm and makes the fragile ones
+     unmissable. Untested is not on the ramp at all. */
+  --m-fragile:    var(--risk);
+  --m-fragile-bg: color-mix(in oklch, var(--risk) 15%, transparent);
+  --m-partial:    color-mix(in oklch, var(--accent) 42%, var(--muted));
+  --m-partial-bg: color-mix(in oklch, var(--accent) 9%, transparent);
+  --m-working:    color-mix(in oklch, var(--accent) 72%, var(--muted));
+  --m-working-bg: color-mix(in oklch, var(--accent) 12%, transparent);
+  --m-solid:      var(--accent);
+  --m-solid-bg:   var(--accent-soft);
+
+  /* -- the Evidence Floor -----------------------------------------------
+     Below it there is no fill, no numeral and no bar — only a hairline in a
+     dash pattern. There is no token here that would let a component opt out. */
+  --floor-stroke: color-mix(in oklch, var(--muted) 72%, transparent);
+  --floor-dash: 3 4;
+  --floor-fg: var(--muted);
+
+  /* -- grounding -------------------------------------------------------- */
+  --cite-line: color-mix(in oklch, var(--accent) 58%, transparent);
+  --cite-bg: var(--accent-soft);
+  --cite-mark-bg: color-mix(in oklch, var(--accent) 20%, transparent);
+
+  /* -- elevation, tinted by the theme's own shadow strength -------------- */
+  --shadow-1:
+    0 1px 2px oklch(0 0 0 / calc(var(--shadow-a) * 0.45)),
+    0 1px 1px oklch(0 0 0 / calc(var(--shadow-b) * 0.4));
+  --shadow-2:
+    0 6px 16px -4px oklch(0 0 0 / calc(var(--shadow-a) * 0.7)),
+    0 2px 6px -2px oklch(0 0 0 / calc(var(--shadow-b) * 0.6));
+  --shadow-3:
+    0 28px 56px -16px oklch(0 0 0 / var(--shadow-a)),
+    0 10px 24px -10px oklch(0 0 0 / var(--shadow-b));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --d-1: 1ms; --d-2: 1ms; --d-3: 1ms; --d-4: 1ms; --d-5: 1ms;
+  }
+}
