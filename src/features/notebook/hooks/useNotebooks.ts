@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { notebookService } from "@/lib/services/notebooks";
 import { queryKeys } from "@/lib/query-keys";
-import { useCandidateId } from "@/shared/stores/identity";
+import { useSessionUser } from "@/shared/stores/session";
 import { useToast } from "@/shared/stores/toasts";
 import type { Notebook, SourceUploaded } from "@/shared/types";
 
@@ -20,10 +20,10 @@ export function inFlight(notebooks: Notebook[] | undefined): boolean {
 }
 
 export function useNotebooks() {
-  const candidateId = useCandidateId();
+  const candidateId = useSessionUser() ?? "anonymous";
   return useQuery({
     queryKey: queryKeys.notebooks.list(candidateId),
-    queryFn: () => notebookService.list(candidateId),
+    queryFn: () => notebookService.list(),
     /* Polls only while there is something to watch, and stops when the last
        document finishes. A timer that outlives the work holds the process
        awake for nothing, and the free tier allows about one instance. */
@@ -45,7 +45,7 @@ function describe(uploaded: SourceUploaded): string {
 }
 
 export function useNotebookMutations(notebookId: string | undefined) {
-  const candidateId = useCandidateId();
+  const candidateId = useSessionUser() ?? "anonymous";
   const queryClient = useQueryClient();
   const toast = useToast();
 

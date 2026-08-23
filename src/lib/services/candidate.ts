@@ -6,32 +6,31 @@ import type {
 } from "@/shared/types";
 
 export const candidateService = {
-  confidence: (candidateId: string) =>
-    api.request<CandidateConfidence>(endpoints.candidates.confidence(candidateId)),
+  confidence: () => api.request<CandidateConfidence>(endpoints.candidates.confidence()),
 
   /* Untested Topics are absent here rather than ranked last — they are
      unknown, not weak, and mixing them in is the exact conflation the whole
      model exists to prevent. */
-  weakest: (candidateId: string, limit = 10) =>
-    api.request<{ topics: TopicReading[] }>(endpoints.candidates.weakest(candidateId, limit)),
+  weakest: (limit = 10) =>
+    api.request<{ topics: TopicReading[] }>(endpoints.candidates.weakest(limit)),
 
-  credits: (candidateId: string) =>
-    api.request<CreditsRecord>(endpoints.candidates.credits(candidateId)),
+  credits: () => api.request<CreditsRecord>(endpoints.candidates.credits()),
 
   /* Where a Candidate stands on one Topic. Asked for a Topic at a time and
      never for a list, which is what stops it becoming an order (ADR-0022). */
-  topicStanding: (candidateId: string, topicId: string) =>
-    api.request<TopicStanding>(endpoints.candidates.topicStanding(candidateId, topicId)),
+  topicStanding: (topicId: string) =>
+    api.request<TopicStanding>(endpoints.candidates.topicStanding(topicId)),
 
   /* Coverage compared as Coverage. Its own route, its own shape, never
      combined with the above into a position. */
-  coverageStanding: (candidateId: string) =>
-    api.request<CoverageStanding>(endpoints.candidates.coverageStanding(candidateId)),
+  coverageStanding: () =>
+    api.request<CoverageStanding>(endpoints.candidates.coverageStanding()),
 
-  attachKey: (candidateId: string, openrouterKey: string) =>
+  /* No candidate_id: whose key it is comes from the token that carried it. */
+  attachKey: (openrouterKey: string) =>
     api.request<{ key_id: string; fingerprint: string; status: string }>(
       endpoints.candidates.attachKey(),
-      { method: "POST", body: { candidate_id: candidateId, openrouter_key: openrouterKey } },
+      { method: "POST", body: { openrouter_key: openrouterKey } },
     ),
 
   revokeKey: (keyId: string) =>

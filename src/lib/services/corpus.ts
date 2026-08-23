@@ -6,9 +6,10 @@ export const corpusService = {
   tracks: () => api.request<Track[]>(endpoints.corpus.tracks()),
 
   /* The picker asks as the Candidate, so their own notebooks are listed and
-     nobody else's are. */
-  modules: (candidateId: string, track?: string) =>
-    api.request<Module[]>(endpoints.corpus.modules(track, candidateId)),
+     nobody else's are — and "as the Candidate" is the token now, not an id the
+     caller supplies. */
+  modules: (track?: string) =>
+    api.request<Module[]>(endpoints.corpus.modules(track)),
 
   scope: (moduleIds: readonly string[]) =>
     moduleIds.length === 0

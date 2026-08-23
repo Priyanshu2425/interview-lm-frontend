@@ -1,13 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { corpusService } from "@/lib/services/corpus";
 import { queryKeys } from "@/lib/query-keys";
-import { useCandidateId } from "@/shared/stores/identity";
+import { useSessionUser } from "@/shared/stores/session";
 
 export function useModules(track?: string) {
-  const candidateId = useCandidateId();
+  const candidateId = useSessionUser() ?? "anonymous";
   return useQuery({
     queryKey: queryKeys.corpus.modules(track, candidateId),
-    queryFn: () => corpusService.modules(candidateId, track),
+    queryFn: () => corpusService.modules(track),
   });
 }
 

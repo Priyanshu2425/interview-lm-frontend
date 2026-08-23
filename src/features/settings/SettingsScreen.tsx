@@ -7,7 +7,8 @@ import { THEMES, useThemeStore } from "@/shared/stores/theme";
 import type { ThemeKey } from "@/shared/stores/theme";
 import { PROVIDERS, usePreferenceStore } from "@/shared/stores/preferences";
 import type { Preferences } from "@/shared/stores/preferences";
-import { useIdentityStore } from "@/shared/stores/identity";
+import { useSessionUser } from "@/shared/stores/session";
+import { signOut } from "@/lib/auth/gatehouse";
 import { useToast } from "@/shared/stores/toasts";
 import { useCredits } from "@/features/credits/hooks/useCredits";
 import { SettingsNav } from "./components/SettingsNav";
@@ -41,7 +42,7 @@ export function SettingsScreen() {
   const resetPrefs = usePreferenceStore((s) => s.reset);
   const theme = useThemeStore((s) => s.theme);
   const setTheme = useThemeStore((s) => s.setTheme);
-  const candidateId = useIdentityStore((s) => s.candidateId);
+  const userId = useSessionUser();
   const { data: credits } = useCredits();
   const toast = useToast();
 
@@ -233,22 +234,41 @@ export function SettingsScreen() {
           <Panel pad={7} className="stack g-7">
             <div className="between">
               <div style={{ minWidth: 0 }}>
-                <span className="label">Candidate id</span>
+                <span className="label">Signed in as</span>
                 <p className="caption" style={{ margin: "var(--s-3) 0 0", maxWidth: "56ch" }}>
-                  Sign-in is not built yet, so this browser carries an id it generated. Your Evidence is filed
-                  against it — losing it means losing the handle on your record, not the record itself.
+                  Your account is held by Gatehouse; your Evidence is filed against an identifier
+                  this browser never sees. Signing in on another device reaches the same record.
                 </p>
               </div>
               <Button
                 variant="secondary"
                 size="sm"
                 onClick={() => {
-                  void navigator.clipboard?.writeText(candidateId);
+                  void navigator.clipboard?.writeText(userId ?? "");
                   setCopied(true);
                   setTimeout(() => setCopied(false), 1600);
                 }}
               >
-                {copied ? "Copied" : candidateId}
+                {copied ? "Copied" : (userId ?? "not signed in")}
+              </Button>
+            </div>
+
+            <div className="between hair-t" style={{ paddingTop: "var(--s-6)" }}>
+              <div style={{ minWidth: 0 }}>
+                <span className="label">Sign out</span>
+                <p className="caption" style={{ margin: "var(--s-3) 0 0", maxWidth: "56ch" }}>
+                  Ends this session on this device. Your record, your balance and any key you
+                  attached are untouched — they belong to the account, not to the browser.
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  void signOut().finally(() => { window.location.assign("/login"); });
+                }}
+              >
+                Sign out
               </Button>
             </div>
 

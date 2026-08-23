@@ -7,6 +7,10 @@ import { ExaminationScreen } from "@/features/examination";
 import { EvidenceScreen } from "@/features/evidence";
 import { NotebookScreen } from "@/features/notebook";
 import { NotFoundScreen } from "./NotFoundScreen";
+import {
+  ForgotPasswordScreen, LoginScreen, RegisterScreen, RequireSession,
+  ResetPasswordScreen, VerifyEmailScreen,
+} from "@/features/auth";
 
 /* Credits, Settings and the Operator console are reached deliberately and
    rarely. They are split out so the examination route — the one that matters
@@ -22,7 +26,18 @@ const OperatorScreen = lazy(() =>
 );
 
 export const router = createBrowserRouter([
+  /* Outside the session, and outside the shell: somebody who is not signed in
+     has no record to put a navigation bar around. `/reset-password` and
+     `/verify-email` are here because Gatehouse mails links to them — they are
+     addresses on this domain whether or not anything answers. */
+  { path: "/login", element: <LoginScreen /> },
+  { path: "/register", element: <RegisterScreen /> },
+  { path: "/forgot-password", element: <ForgotPasswordScreen /> },
+  { path: "/reset-password", element: <ResetPasswordScreen /> },
+  { path: "/verify-email", element: <VerifyEmailScreen /> },
   {
+    element: <RequireSession />,
+    children: [{
     path: "/",
     element: <RootLayout />,
     children: [
@@ -40,5 +55,6 @@ export const router = createBrowserRouter([
       { path: "operator", element: <OperatorScreen /> },
       { path: "*", element: <NotFoundScreen /> },
     ],
+    }],
   },
 ]);

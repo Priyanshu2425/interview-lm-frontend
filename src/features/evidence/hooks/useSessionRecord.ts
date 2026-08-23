@@ -3,7 +3,7 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { candidateService } from "@/lib/services/candidate";
 import { sessionService } from "@/lib/services/sessions";
 import { queryKeys } from "@/lib/query-keys";
-import { useCandidateId } from "@/shared/stores/identity";
+import { useSessionUser } from "@/shared/stores/session";
 import type { Citation, GradingMode, SessionSummary, Spend, TopicReading } from "@/shared/types";
 
 export interface EvidenceRow extends TopicReading {
@@ -89,10 +89,10 @@ export function useSessionRecord(sessionId: string): SessionRecordView {
    column of ranks is an order over Topics — which is Topic recommendation by
    another name. */
 export function useTopicStanding(topicId: string | null) {
-  const candidateId = useCandidateId();
+  const candidateId = useSessionUser() ?? "anonymous";
   return useQuery({
     queryKey: queryKeys.candidate.topicStanding(candidateId, topicId ?? ""),
-    queryFn: () => candidateService.topicStanding(candidateId, topicId as string),
+    queryFn: () => candidateService.topicStanding(topicId as string),
     enabled: Boolean(candidateId && topicId),
   });
 }

@@ -12,11 +12,10 @@ export const endpoints = {
 
   corpus: {
     tracks: () => "/corpus/tracks",
-    modules: (track?: string, candidateId?: string) =>
-      `/corpus/modules${q({ track, candidate_id: candidateId })}`,
+    modules: (track?: string) => `/corpus/modules${q({ track })}`,
     scope: (moduleIds: readonly string[]) =>
       `/corpus/scope?${moduleIds.map((id) => `module_id=${encodeURIComponent(id)}`).join("&")}`,
-    provenance: (candidateId?: string) => `/corpus/provenance${q({ candidate_id: candidateId })}`,
+    provenance: () => "/corpus/provenance",
     scopeRelated: (moduleIds: readonly string[]) =>
       `/corpus/scope/related?${moduleIds.map((id) => `module_id=${encodeURIComponent(id)}`).join("&")}`,
     topic: (topicId: string) => `/corpus/topics/${topicId}`,
@@ -32,13 +31,14 @@ export const endpoints = {
     summary: (id: string) => `/sessions/${id}/summary`,
   },
 
+  /* `me` is not a path segment anybody can write: whose record this is comes
+     from the token (ADR-0026). There is no id to pass and none to pass wrongly. */
   candidates: {
-    confidence: (id: string) => `/candidates/${id}/confidence`,
-    weakest: (id: string, limit = 10) => `/candidates/${id}/weakest${q({ limit })}`,
-    credits: (id: string) => `/candidates/${id}/credits`,
-    topicStanding: (id: string, topicId: string) =>
-      `/candidates/${id}/topics/${topicId}/standing`,
-    coverageStanding: (id: string) => `/candidates/${id}/coverage-standing`,
+    confidence: () => "/candidates/me/confidence",
+    weakest: (limit = 10) => `/candidates/me/weakest${q({ limit })}`,
+    credits: () => "/candidates/me/credits",
+    topicStanding: (topicId: string) => `/candidates/me/topics/${topicId}/standing`,
+    coverageStanding: () => "/candidates/me/coverage-standing",
     attachKey: () => "/candidates/me/byok",
     revokeKey: (keyId: string) => `/candidates/me/byok/${keyId}`,
   },
@@ -47,7 +47,7 @@ export const endpoints = {
   providers: { prices: () => "/providers/prices" },
 
   notebooks: {
-    list: (candidateId: string) => `/notebooks${q({ candidate_id: candidateId })}`,
+    list: () => "/notebooks",
     create: () => "/notebooks",
     one: (id: string) => `/notebooks/${id}`,
     sources: (id: string) => `/notebooks/${id}/sources`,

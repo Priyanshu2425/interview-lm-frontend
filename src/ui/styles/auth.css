@@ -1,0 +1,56 @@
+/* The sign-in screens.
+
+   Lifted from the design files at ~/Documents/interviewlmauth rather than
+   reconstructed: unlike the rest of the prototype, these shipped a <style>
+   block, and it was written against this project's own tokens. Every custom
+   property it uses is already defined in tokens.css — checked, not assumed —
+   so this is the design's own rules rather than an approximation of them. */
+
+.auth { display: grid; grid-template-columns: 1.05fr 1fr; min-height: 100vh; }
+  .auth-brand {
+    padding: var(--s-11) var(--s-9); display: flex; flex-direction: column; gap: var(--s-9);
+    background: var(--surface); border-right: var(--bw-hair) solid var(--border);
+    position: relative; overflow: hidden;
+  }
+  .auth-brand::after {
+    content: ""; position: absolute; inset: auto -40% -60% auto; width: 70%; aspect-ratio: 1;
+    background: radial-gradient(circle at 50% 50%, var(--accent-soft), transparent 62%);
+    pointer-events: none;
+  }
+  .auth-brand > * { position: relative; }
+  .brand-mini { display: none; align-items: center; gap: var(--s-3); }
+  .brand-mini .brand-mark { width: 24px; height: 24px; font-size: var(--t-12); }
+  .brand-mini .brand-name { font-size: var(--t-14); }
+  .auth-motif { display: grid; gap: var(--s-4); padding: var(--s-6) 0; border-top: var(--bw-hair) solid var(--border); border-bottom: var(--bw-hair) solid var(--border); }
+  .beta-hero { width: 100%; height: 120px; }
+  .auth-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; padding-top: var(--s-7); border-top: var(--bw-hair) solid var(--border); }
+
+  .auth-form { display: grid; place-items: center; padding: var(--s-9) var(--s-6); }
+  .auth-card { width: 100%; max-width: 384px; display: grid; gap: var(--s-5); }
+  .auth-card .field { gap: var(--s-2); }
+  .input-pw { position: relative; }
+  .input-pw .input { padding-right: 42px; }
+  .pw-toggle {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    width: 34px; height: 34px; border: 0; background: transparent; color: var(--muted);
+    border-radius: var(--r-xs); cursor: pointer; display: grid; place-items: center;
+    transition: background var(--d-1) var(--e-out), color var(--d-1) var(--e-out);
+  }
+  .pw-toggle:hover { background: var(--surface-2); color: var(--fg); }
+  .pw-toggle:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .pw-toggle svg { width: 18px; height: 18px; }
+  .auth-divider { display: flex; align-items: center; gap: var(--s-4); color: var(--muted); font-size: var(--t-11); font-family: var(--font-mono); letter-spacing: var(--ls-caps); text-transform: uppercase; }
+  .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  .g-mark { width: 18px; height: 18px; flex: none; }
+  .btn[data-busy="1"] { pointer-events: none; opacity: 0.82; }
+  .btn[data-busy="1"] .btn-label { visibility: hidden; }
+  .btn[data-busy="1"] .btn-busy { display: inline-flex; }
+  .btn-busy { display: none; align-items: center; gap: var(--s-3); }
+  .signin-alt { text-align: center; }
+
+  @media (max-width: 880px) {
+    .auth { grid-template-columns: 1fr; }
+    .auth-brand { display: none; }
+    .brand-mini { display: flex; }
+    .auth-form { padding: var(--s-11) var(--s-5) var(--s-13); min-height: 100vh; }
+  }

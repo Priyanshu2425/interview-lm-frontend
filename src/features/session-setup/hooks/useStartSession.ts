@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { sessionService } from "@/lib/services/sessions";
-import { useCandidateId } from "@/shared/stores/identity";
+import { useSessionUser } from "@/shared/stores/session";
 import { useSessionHistory } from "@/shared/stores/sessionHistory";
 import { useToast } from "@/shared/stores/toasts";
 
@@ -12,7 +12,7 @@ export interface StartInput {
 }
 
 export function useStartSession() {
-  const candidateId = useCandidateId();
+  const candidateId = useSessionUser() ?? "anonymous";
   const navigate = useNavigate();
   const remember = useSessionHistory((s) => s.remember);
   const toast = useToast();

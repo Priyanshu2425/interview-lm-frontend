@@ -6,6 +6,8 @@
      - decide what to ask next. Topic selection lives in the graph.
      - hold an Answer Key. There is no route that would return one. */
 
+import { currentToken, refresh } from "./auth/gatehouse";
+
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string | null;
@@ -71,6 +73,15 @@ export interface ClientOptions {
   credentials?: RequestCredentials;
 }
 
+/* The token is attached here rather than by every caller, and a 401 is retried
+   exactly once behind the single in-flight refresh (ADR-0026). Retrying more
+   than once would be a loop: the second 401 after a fresh token is an answer
+   about this request, not about the session. */
+async function authorize(headers: Record<string, string>): Promise<Record<string, string>> {
+  const token = currentToken();
+  return token ? { ...headers, authorization: `Bearer ${token}` } : headers;
+}
+
 export function createApiClient(baseUrl: string, options: ClientOptions = {}): ApiClient {
   const credentials = options.credentials ?? "same-origin";
 
@@ -85,22 +96,34 @@ export function createApiClient(baseUrl: string, options: ClientOptions = {}): A
   return {
     async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
       const { method = "GET", body, headers, signal } = options;
-      const response = await fetch(baseUrl + path, {
-        method,
-        signal,
-        credentials,
-        headers: { "content-type": "application/json", ...headers },
-        body: body === undefined ? undefined : JSON.stringify(body),
-      });
+      const send = async (extra: Record<string, string>): Promise<Response> =>
+        fetch(baseUrl + path, {
+          method,
+          signal,
+          credentials,
+          headers: { "content-type": "application/json", ...headers, ...extra },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+
+      let response = await send(await authorize({}));
+      if (response.status === 401 && (await refresh()) !== null) {
+        response = await send(await authorize({}));
+      }
       return settle<T>(response, `${response.status} ${response.statusText}`);
     },
 
     /* A PDF is a file. Sending it through the JSON helper would mean base64,
        which doubles a 20 MB upload for nothing. */
     async upload<T>(path: string, form: FormData, signal?: AbortSignal): Promise<T> {
-      const response = await fetch(baseUrl + path, {
-        method: "POST", body: form, signal, credentials,
-      });
+      const send = async (): Promise<Response> =>
+        fetch(baseUrl + path, {
+          method: "POST", body: form, signal, credentials,
+          headers: await authorize({}),
+        });
+      let response = await send();
+      if (response.status === 401 && (await refresh()) !== null) {
+        response = await send();
+      }
       return settle<T>(response, `${response.status} ${response.statusText}`);
     },
   };

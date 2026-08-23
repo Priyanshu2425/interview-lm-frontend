@@ -2,24 +2,24 @@ import { useQuery } from "@tanstack/react-query";
 import { candidateService } from "@/lib/services/candidate";
 import { sessionService } from "@/lib/services/sessions";
 import { queryKeys } from "@/lib/query-keys";
-import { useCandidateId } from "@/shared/stores/identity";
+import { useSessionUser } from "@/shared/stores/session";
 import { useLatestSession } from "@/shared/stores/sessionHistory";
 
 export function useConfidence() {
-  const candidateId = useCandidateId();
+  const candidateId = useSessionUser() ?? "anonymous";
   return useQuery({
     queryKey: queryKeys.candidate.confidence(candidateId),
-    queryFn: () => candidateService.confidence(candidateId),
+    queryFn: () => candidateService.confidence(),
   });
 }
 
 /* Topics that look weakest, among those with enough evidence to say. Untested
    Topics are absent rather than ranked last: they are unknown, not weak. */
 export function useWeakest(limit = 6) {
-  const candidateId = useCandidateId();
+  const candidateId = useSessionUser() ?? "anonymous";
   return useQuery({
     queryKey: queryKeys.candidate.weakest(candidateId),
-    queryFn: () => candidateService.weakest(candidateId, limit),
+    queryFn: () => candidateService.weakest(limit),
   });
 }
 
@@ -45,10 +45,10 @@ export function useUntestedModules() {
    the two are fetched by different hooks and rendered in different places, and
    no function anywhere takes both. */
 export function useCoverageStanding() {
-  const candidateId = useCandidateId();
+  const candidateId = useSessionUser() ?? "anonymous";
   return useQuery({
     queryKey: queryKeys.candidate.coverageStanding(candidateId),
-    queryFn: () => candidateService.coverageStanding(candidateId),
+    queryFn: () => candidateService.coverageStanding(),
     enabled: Boolean(candidateId),
   });
 }

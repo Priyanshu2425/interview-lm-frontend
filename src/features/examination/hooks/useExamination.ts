@@ -5,7 +5,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { ApiError } from "@/lib/api-client";
 import { useSessionHistory } from "@/shared/stores/sessionHistory";
 import { useToast } from "@/shared/stores/toasts";
-import { useCandidateId } from "@/shared/stores/identity";
+import { useSessionUser } from "@/shared/stores/session";
 import type {
   Citation, QuestionPayload, SessionEnded, SessionParked, TurnResult, VisitClosed,
 } from "@/shared/types";
@@ -61,7 +61,7 @@ export interface ExaminationState {
 
 export function useExamination(sessionId: string): ExaminationState {
   const queryClient = useQueryClient();
-  const candidateId = useCandidateId();
+  const candidateId = useSessionUser() ?? "anonymous";
   const toast = useToast();
   const markEnded = useSessionHistory((s) => s.markEnded);
 

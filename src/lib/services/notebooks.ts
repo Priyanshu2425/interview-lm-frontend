@@ -3,7 +3,7 @@ import { endpoints } from "../endpoints";
 import type { Notebook, SourceUploaded } from "@/shared/types";
 
 export const notebookService = {
-  list: (candidateId: string) => api.request<Notebook[]>(endpoints.notebooks.list(candidateId)),
+  list: () => api.request<Notebook[]>(endpoints.notebooks.list()),
 
   /* One Library, with each document's state and progress. This is what the
      surface polls while an ingest runs — a plain read of rows the worker is

@@ -1,14 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { candidateService } from "@/lib/services/candidate";
 import { queryKeys } from "@/lib/query-keys";
-import { useCandidateId } from "@/shared/stores/identity";
+import { useSessionUser } from "@/shared/stores/session";
 import { useToast } from "@/shared/stores/toasts";
 
 export function useCredits() {
-  const candidateId = useCandidateId();
+  const candidateId = useSessionUser() ?? "anonymous";
   return useQuery({
     queryKey: queryKeys.candidate.credits(candidateId),
-    queryFn: () => candidateService.credits(candidateId),
+    queryFn: () => candidateService.credits(),
   });
 }
 
@@ -24,7 +24,7 @@ export function usePrices() {
 }
 
 export function useKeyMutations() {
-  const candidateId = useCandidateId();
+  const candidateId = useSessionUser() ?? "anonymous";
   const queryClient = useQueryClient();
   const toast = useToast();
 
@@ -33,7 +33,7 @@ export function useKeyMutations() {
   };
 
   const attach = useMutation({
-    mutationFn: (key: string) => candidateService.attachKey(candidateId, key),
+    mutationFn: (key: string) => candidateService.attachKey(key),
     onSuccess: (k) => {
       invalidate();
       toast({
