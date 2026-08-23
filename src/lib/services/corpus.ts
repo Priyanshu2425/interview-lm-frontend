@@ -1,6 +1,6 @@
 import { api } from "../api-client";
 import { endpoints } from "../endpoints";
-import type { Module, Scope, Track } from "@/shared/types";
+import type { Module, Scope, TouchedModule, Track } from "@/shared/types";
 
 export const corpusService = {
   tracks: () => api.request<Track[]>(endpoints.corpus.tracks()),
@@ -19,4 +19,12 @@ export const corpusService = {
           strongest_mode: null,
         })
       : api.request<Scope>(endpoints.corpus.scope(moduleIds)),
+
+  /* Which Modules the chosen scope shares material with. Ranked and aggregated
+     by the server, because summing edges and ordering the result is deciding
+     something and the surface decides nothing (ADR-0009). */
+  scopeRelated: (moduleIds: readonly string[]) =>
+    moduleIds.length === 0
+      ? Promise.resolve<TouchedModule[]>([])
+      : api.request<TouchedModule[]>(endpoints.corpus.scopeRelated(moduleIds)),
 };

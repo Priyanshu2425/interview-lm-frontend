@@ -29,3 +29,13 @@ export function useScope(moduleIds: readonly string[]) {
     enabled: moduleIds.length > 0,
   });
 }
+
+/* Which Modules the chosen scope touches (ADR-0023). A reading of the material,
+   asked for at the one moment nothing has been measured about the Candidate. */
+export function useScopeRelated(moduleIds: readonly string[]) {
+  return useQuery({
+    queryKey: queryKeys.corpus.scopeRelated(moduleIds),
+    queryFn: () => corpusService.scopeRelated(moduleIds),
+    enabled: moduleIds.length > 0,
+  });
+}

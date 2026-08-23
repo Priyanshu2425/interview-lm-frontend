@@ -124,20 +124,28 @@ function ModuleRow({ module: m, checked, onToggle }: {
   checked: boolean;
   onToggle: () => void;
 }) {
-  /* A Module that extracted to nothing is listed and cannot be chosen. Hiding
-     it would make Coverage a measure of what parsed rather than of what the
-     Candidate uploaded. */
+  /* A Module that cannot be examined is listed and cannot be chosen. Hiding it
+     would make Coverage a measure of what parsed rather than of what the
+     Candidate uploaded — and a document still being read would look like one
+     that never arrived. Either way it says which of the two it is: the reason
+     is the API's own, never composed here. */
   if (!m.selectable) {
+    const waiting = m.state === "uploaded" || m.state === "ingesting";
     return (
       <div className="scope-item" data-unusable="">
         <span className="scope-mark" aria-hidden="true"><Icon name="info" size={13} /></span>
         <span>
           <span className="body-sm">{m.title}</span>
           <span className="caption" style={{ display: "block" }}>
-            {m.stub_reason ?? "No text could be read from this source."} It holds no Topic, so it cannot be examined.
+            {m.stub_reason ?? "No text could be read from this source."}{" "}
+            {waiting
+              ? "It becomes examinable when it has finished."
+              : "It holds no Topic, so it cannot be examined."}
           </span>
         </span>
-        <Tag tone="warn">Unusable</Tag>
+        <Tag tone={waiting ? "accent" : m.state === "failed" ? "risk" : "warn"}>
+          {waiting ? "Reading" : m.state === "failed" ? "Failed" : "Unusable"}
+        </Tag>
       </div>
     );
   }

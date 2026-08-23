@@ -3,9 +3,10 @@ import { PageHeader, Workbench } from "@/shared/components";
 import { ButtonLink, Choice, Icon, Panel, SelectField } from "@/ui";
 import { PROVIDERS, usePreferenceStore } from "@/shared/stores/preferences";
 import { useLatestRunningSession } from "@/shared/stores/sessionHistory";
-import { useModules, useScope } from "./hooks/useCorpus";
+import { useModules, useScope, useScopeRelated } from "./hooks/useCorpus";
 import { useStartSession } from "./hooks/useStartSession";
 import { ScopePicker } from "./components/ScopePicker";
+import { TouchedModules } from "./components/TouchedModules";
 import { SessionPreview } from "./components/SessionPreview";
 import { EvidenceRules } from "./components/EvidenceRules";
 
@@ -32,6 +33,7 @@ export function SessionSetupScreen() {
 
   const moduleIds = useMemo(() => [...selected].sort(), [selected]);
   const { data: scope, isFetching: loadingScope } = useScope(moduleIds);
+  const { data: touched } = useScopeRelated(moduleIds);
 
   const toggle = useCallback((id: string) => {
     setSelected((prev) => {
@@ -104,6 +106,7 @@ export function SessionSetupScreen() {
             onToggle={toggle}
             onSetMany={setMany}
           />
+          <TouchedModules touched={touched} onAdd={toggle} />
           <p className="caption mt-4">
             The scheduler picks Topics inside this scope. It can tell an unasked Topic from a failed one, which
             is the whole reason it can choose well.

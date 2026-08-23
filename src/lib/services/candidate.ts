@@ -1,6 +1,9 @@
 import { api } from "../api-client";
 import { endpoints } from "../endpoints";
-import type { CandidateConfidence, CreditsRecord, ProviderPrices, TopicReading } from "@/shared/types";
+import type {
+  CandidateConfidence, CoverageStanding, CreditsRecord, ProviderPrices, TopicReading,
+  TopicStanding,
+} from "@/shared/types";
 
 export const candidateService = {
   confidence: (candidateId: string) =>
@@ -14,6 +17,16 @@ export const candidateService = {
 
   credits: (candidateId: string) =>
     api.request<CreditsRecord>(endpoints.candidates.credits(candidateId)),
+
+  /* Where a Candidate stands on one Topic. Asked for a Topic at a time and
+     never for a list, which is what stops it becoming an order (ADR-0022). */
+  topicStanding: (candidateId: string, topicId: string) =>
+    api.request<TopicStanding>(endpoints.candidates.topicStanding(candidateId, topicId)),
+
+  /* Coverage compared as Coverage. Its own route, its own shape, never
+     combined with the above into a position. */
+  coverageStanding: (candidateId: string) =>
+    api.request<CoverageStanding>(endpoints.candidates.coverageStanding(candidateId)),
 
   attachKey: (candidateId: string, openrouterKey: string) =>
     api.request<{ key_id: string; fingerprint: string; status: string }>(

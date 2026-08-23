@@ -19,6 +19,52 @@ export interface Track {
   topic_count?: number;
 }
 
+/** A Module the chosen scope shares material with.
+ *
+ *  Deliberately carries no figure about the Candidate — no Coverage, no
+ *  Mastery, nothing that could be combined into one. Related Topics is a claim
+ *  about the material, and the picker is where that claim cannot be misread as
+ *  a claim about the person: nothing has been measured yet (ADR-0023). */
+export interface TouchedModule {
+  module_id: string;
+  title: string;
+  track_key: string;
+  /** Already in the chosen scope. This is what tells a same-Module neighbour
+   *  from a cross-Module one at this placement: covered, or sideways. */
+  in_scope: boolean;
+  edges: number;
+  score: number;
+  selectable: boolean;
+}
+
+/** Where a Candidate stands on **one** Topic of a shared Library.
+ *
+ *  Inside a Topic, Mastery means one thing and ordering it fuses nothing, so
+ *  the number is available — and it is the only comparison that is. There is no
+ *  overall position and no route that returns one (ADR-0022). */
+export interface TopicStanding {
+  topic_id: string;
+  /** Null whenever the reading is unavailable, and `reason` always says which
+   *  of the several reasons it is: below the Evidence Floor, below the Cohort
+   *  Floor, or a Library nobody else holds. */
+  rank: number | null;
+  cohort: number;
+  /** Others hold this same position because the mathematics cannot separate
+   *  them — `#7= of 340` rather than `#7 of 340`. */
+  shared: boolean;
+  reason: string | null;
+}
+
+/** Coverage compared as Coverage. A second, separate reading, from a separate
+ *  route, never combined with a Topic rank into a position. */
+export interface CoverageStanding {
+  topics_examined: number;
+  topics_available: number;
+  cohort: number;
+  percentile: number | null;
+  reason: string | null;
+}
+
 export interface Module {
   module_id: string;
   track_key: string;
@@ -29,9 +75,14 @@ export interface Module {
   ground_truth_topic_count: number;
   ceiling: GradingMode;
   /* A Module whose Source carried no retrievable text is listed and cannot be
-     chosen. Hiding it would make Coverage a measure of what parsed. */
+     chosen. Hiding it would make Coverage a measure of what parsed. So is one
+     that has not finished being read: a forty-second import that vanished from
+     the picker would look like a document that never arrived. */
   selectable: boolean;
   stub_reason: string | null;
+  state: SourceState;
+  progress_done: number;
+  progress_total: number;
 }
 
 export interface Scope {
@@ -235,12 +286,27 @@ export interface ProviderPrices {
   why: string;
 }
 
+export type SourceState = "uploaded" | "ingesting" | "ready" | "failed" | "stub";
+
 export interface NotebookSource {
   source_id: string;
   module_id: string;
   title: string;
-  state: string;
+  /** A Source exists as soon as its bytes do, so a document is in the Library
+   *  before it is examinable. Only `ready` may be scoped to a Session. */
+  state: SourceState;
   stub_reason: string | null;
+  /** Sections embedded of sections found. Never indeterminate: the total is
+   *  measured at upload, before the first provider call — forty seconds of
+   *  spinner is indistinguishable from a hang. */
+  progress_done: number;
+  progress_total: number;
+  selectable: boolean;
+  /** How long the current ingest has been running, and how long since it last
+   *  moved. Both reported, neither judged: how long is too long is unknown
+   *  until real documents have been through it. */
+  elapsed_seconds: number | null;
+  since_progress_seconds: number | null;
 }
 
 export interface Notebook {
@@ -249,6 +315,24 @@ export interface Notebook {
   title: string;
   embedding_model: string;
   sources: NotebookSource[];
+  /** personal | shared. A shared Library is imported once by an operator and is
+   *  read-only to every Candidate — it is what makes two people's Mastery on a
+   *  Topic the same measurement rather than two unrelated ones. The surface
+   *  offers no control that would write to one. */
+  visibility: "personal" | "shared";
+}
+
+/** What an upload answers with. Deliberately not what the ingest produced: the
+ *  request returns before the embedding starts, so there are no Topics to
+ *  report yet — only the work found. */
+export interface SourceUploaded {
+  source_id: string;
+  module_id: string;
+  state: SourceState;
+  stub_reason: string | null;
+  deduplicated: boolean;
+  progress_done: number;
+  progress_total: number;
 }
 
 export interface SourceAdded {

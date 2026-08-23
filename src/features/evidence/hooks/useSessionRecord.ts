@@ -1,7 +1,9 @@
 import { useMemo } from "react";
-import { useQueries } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
+import { candidateService } from "@/lib/services/candidate";
 import { sessionService } from "@/lib/services/sessions";
 import { queryKeys } from "@/lib/query-keys";
+import { useCandidateId } from "@/shared/stores/identity";
 import type { Citation, GradingMode, SessionSummary, Spend, TopicReading } from "@/shared/types";
 
 export interface EvidenceRow extends TopicReading {
@@ -76,4 +78,21 @@ export function useSessionRecord(sessionId: string): SessionRecordView {
     spend: spendQ.data,
     rows,
   };
+}
+
+
+/* Where the Candidate stands on one Topic (ADR-0022).
+
+   `enabled` is the placement, not an optimisation: the standing is fetched when
+   a Candidate opens one Topic's drawer and never for the table. A rank that
+   arrives with every row is a column, a column can be scanned, and a scannable
+   column of ranks is an order over Topics — which is Topic recommendation by
+   another name. */
+export function useTopicStanding(topicId: string | null) {
+  const candidateId = useCandidateId();
+  return useQuery({
+    queryKey: queryKeys.candidate.topicStanding(candidateId, topicId ?? ""),
+    queryFn: () => candidateService.topicStanding(candidateId, topicId as string),
+    enabled: Boolean(candidateId && topicId),
+  });
 }

@@ -3,21 +3,45 @@ import { notebookService } from "@/lib/services/notebooks";
 import { queryKeys } from "@/lib/query-keys";
 import { useCandidateId } from "@/shared/stores/identity";
 import { useToast } from "@/shared/stores/toasts";
-import type { SourceAdded } from "@/shared/types";
+import type { Notebook, SourceUploaded } from "@/shared/types";
+
+/* How often the Library asks again while a document is being read. The poll is
+   doing two jobs: it drives the progress readout, and because an idle host spins
+   down and any inbound request resets that timer, it keeps the server awake for
+   as long as somebody is watching. That is a side effect of a request we need
+   anyway rather than a keep-alive built for its own sake — so it stops the
+   moment nothing is in flight. */
+const POLL_MS = 1_500;
+
+export function inFlight(notebooks: Notebook[] | undefined): boolean {
+  return (notebooks ?? []).some((n) =>
+    n.sources.some((s) => s.state === "uploaded" || s.state === "ingesting"),
+  );
+}
 
 export function useNotebooks() {
   const candidateId = useCandidateId();
   return useQuery({
     queryKey: queryKeys.notebooks.list(candidateId),
     queryFn: () => notebookService.list(candidateId),
+    /* Polls only while there is something to watch, and stops when the last
+       document finishes. A timer that outlives the work holds the process
+       awake for nothing, and the free tier allows about one instance. */
+    refetchInterval: (query) =>
+      inFlight(query.state.data as Notebook[] | undefined) ? POLL_MS : false,
   });
 }
 
-function describe(added: SourceAdded): string {
-  if (added.state === "stub") {
-    return added.stub_reason ?? "No text could be read from it.";
+function describe(uploaded: SourceUploaded): string {
+  if (uploaded.state === "stub") {
+    return uploaded.stub_reason ?? "No text could be read from it.";
   }
-  return `${added.topics} Topic${added.topics === 1 ? "" : "s"} · ${added.chunks} chunk${added.chunks === 1 ? "" : "s"}`;
+  if (uploaded.deduplicated) return "It was already in this Library.";
+  /* Work found, before any work is done. The upload answers before the
+     embedding starts, so there are no Topics to report yet — and a count of
+     zero Topics would read as a document that produced nothing. */
+  const n = uploaded.progress_total;
+  return `${n} section${n === 1 ? "" : "s"} to read. It is being embedded now.`;
 }
 
 export function useNotebookMutations(notebookId: string | undefined) {
@@ -44,7 +68,7 @@ export function useNotebookMutations(notebookId: string | undefined) {
       /* Sequential on purpose. Each ingest debits the same ledger, and firing
          them together would race the balance check that refuses the one that
          cannot be paid for. */
-      const added: SourceAdded[] = [];
+      const added: SourceUploaded[] = [];
       for (const file of files) added.push(await notebookService.addFile(notebookId, file));
       return added;
     },
@@ -52,7 +76,7 @@ export function useNotebookMutations(notebookId: string | undefined) {
       invalidate();
       const stubs = added.filter((a) => a.state === "stub");
       toast({
-        title: `${added.length} source${added.length === 1 ? "" : "s"} ingested`,
+        title: `${added.length} document${added.length === 1 ? "" : "s"} added`,
         body: stubs.length
           ? `${stubs.length} could not be read: ${stubs[0].stub_reason ?? "no extractable text"}. They are listed rather than hidden.`
           : describe(added[0]),
@@ -73,9 +97,24 @@ export function useNotebookMutations(notebookId: string | undefined) {
     },
     onSuccess: (added) => {
       invalidate();
-      toast({ title: "Note ingested", body: describe(added), tone: "ok" });
+      toast({ title: "Note added", body: describe(added), tone: "ok" });
     },
     onError: (e: Error) => toast({ title: "Ingest did not start", body: e.message, tone: "risk" }),
+  });
+
+  const retrySource = useMutation({
+    mutationFn: ({ sourceId }: { sourceId: string; title: string }) => {
+      if (!notebookId) throw new Error("There is no notebook to retry in.");
+      return notebookService.retry(notebookId, sourceId);
+    },
+    onSuccess: (_data, variables) => {
+      invalidate();
+      toast({
+        title: `Reading ${variables.title} again`,
+        body: "The document was kept, so this re-embeds it and does not upload it again.",
+      });
+    },
+    onError: (e: Error) => toast({ title: "It was not retried", body: e.message, tone: "risk" }),
   });
 
   const removeSource = useMutation({
@@ -107,5 +146,5 @@ export function useNotebookMutations(notebookId: string | undefined) {
     onError: (e: Error) => toast({ title: "It was not deleted", body: e.message, tone: "risk" }),
   });
 
-  return { create, addFiles, addText, removeSource, removeNotebook };
+  return { create, addFiles, addText, retrySource, removeSource, removeNotebook };
 }

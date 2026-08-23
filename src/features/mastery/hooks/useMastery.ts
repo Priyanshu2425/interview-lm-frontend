@@ -36,3 +36,19 @@ export function useUntestedModules() {
     select: (summary) => summary.untested_modules,
   });
 }
+
+
+/* Coverage compared as Coverage (ADR-0022).
+
+   A second, separate reading from a separate route. It is never combined with a
+   Topic rank into a position, and there is nothing on this screen that could:
+   the two are fetched by different hooks and rendered in different places, and
+   no function anywhere takes both. */
+export function useCoverageStanding() {
+  const candidateId = useCandidateId();
+  return useQuery({
+    queryKey: queryKeys.candidate.coverageStanding(candidateId),
+    queryFn: () => candidateService.coverageStanding(candidateId),
+    enabled: Boolean(candidateId),
+  });
+}

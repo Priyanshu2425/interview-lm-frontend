@@ -103,6 +103,14 @@ export function Reading({ band, label, mastery, size = "md" }: {
     <span className="mastery">
       <span className={cn("mastery-num", size === "sm" && "mastery-num-sm")}>{mastery.toFixed(2)}</span>
       <span className="mastery-unit">mastery</span>
+      {/* The band, in words, for anyone not reading the colour.
+
+          Which band a figure falls in is drawn as a tint, and a tint is the one
+          thing a greyscale screen and a screen reader both lose. 0.60 does not
+          say whether this system calls it weak or solid — the band does, and it
+          is decided by the server and handed here as `label`, so saying it adds
+          no second implementation of the Evidence Floor (ADR-0009). */}
+      <span className="visually-hidden">{label}</span>
     </span>
   );
 }

@@ -17,6 +17,8 @@ export const endpoints = {
     scope: (moduleIds: readonly string[]) =>
       `/corpus/scope?${moduleIds.map((id) => `module_id=${encodeURIComponent(id)}`).join("&")}`,
     provenance: (candidateId?: string) => `/corpus/provenance${q({ candidate_id: candidateId })}`,
+    scopeRelated: (moduleIds: readonly string[]) =>
+      `/corpus/scope/related?${moduleIds.map((id) => `module_id=${encodeURIComponent(id)}`).join("&")}`,
     topic: (topicId: string) => `/corpus/topics/${topicId}`,
   },
 
@@ -34,6 +36,9 @@ export const endpoints = {
     confidence: (id: string) => `/candidates/${id}/confidence`,
     weakest: (id: string, limit = 10) => `/candidates/${id}/weakest${q({ limit })}`,
     credits: (id: string) => `/candidates/${id}/credits`,
+    topicStanding: (id: string, topicId: string) =>
+      `/candidates/${id}/topics/${topicId}/standing`,
+    coverageStanding: (id: string) => `/candidates/${id}/coverage-standing`,
     attachKey: () => "/candidates/me/byok",
     revokeKey: (keyId: string) => `/candidates/me/byok/${keyId}`,
   },
@@ -48,6 +53,7 @@ export const endpoints = {
     sources: (id: string) => `/notebooks/${id}/sources`,
     files: (id: string) => `/notebooks/${id}/files`,
     source: (id: string, sourceId: string) => `/notebooks/${id}/sources/${sourceId}`,
+    retry: (id: string, sourceId: string) => `/notebooks/${id}/sources/${sourceId}/retry`,
   },
 
   operator: {

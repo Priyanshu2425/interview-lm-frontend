@@ -32,7 +32,14 @@ export function PageHeader({ eyebrow, title, sub, children }: PageHeaderProps) {
 
       <div className="topbar-title">
         {eyebrow ? <span className="eyebrow">{eyebrow}</span> : null}
-        <strong>{title}</strong>
+        {/* The page's heading, and it has to actually be one.
+
+            A reader navigating by headings had nothing to land on here: the
+            title was a `strong`, which reads as emphasis and not as structure.
+            The role is put on the existing element rather than swapping the tag
+            so that the type styling — which is selected on `strong` — stays
+            exactly where it was. */}
+        <strong role="heading" aria-level={1}>{title}</strong>
       </div>
       {sub ? <span className="caption">{sub}</span> : null}
       <span className="grow" />

@@ -1,4 +1,4 @@
-# Cortex Interviewer — surface
+# InterviewLM — surface
 
 The Candidate and Operator surface, built against the `/v1` contract in
 `../backend/`, in the InterviewLM design system documented in `../DESIGN.md`.

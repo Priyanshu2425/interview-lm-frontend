@@ -1,13 +1,44 @@
 import { useMemo, useState } from "react";
 import { PageHeader, Workbench } from "@/shared/components";
 import {
-  Button, ButtonLink, CostUnknown, Dialog, EmptyState, ErrorState, Icon, Panel, SectionHead,
+  Button, ButtonLink, CostUnknown, Dialog, EmptyState, ErrorState, Icon, Meter, Panel, SectionHead,
   SkeletonLines, Tag, TextAreaField, TextField,
 } from "@/ui";
 import type { Notebook, NotebookSource } from "@/shared/types";
 import { useModules } from "@/features/session-setup";
 import { useNotebookMutations, useNotebooks } from "./hooks/useNotebooks";
 import { Dropzone } from "./components/Dropzone";
+
+/* Five states, and what each reads as. `Unusable` and `Failed` are different
+   facts: one is a document that carries no text at all, the other is a document
+   that does and whose embedding did not finish. Only the second can be retried. */
+const STATE_LABEL: Record<NotebookSource["state"], string> = {
+  uploaded: "Waiting",
+  ingesting: "Reading",
+  ready: "Ready",
+  failed: "Failed",
+  stub: "Unusable",
+};
+
+const STATE_TONE: Record<NotebookSource["state"], "ok" | "warn" | "risk" | "accent"> = {
+  uploaded: "accent",
+  ingesting: "accent",
+  ready: "ok",
+  failed: "risk",
+  stub: "warn",
+};
+
+/* Why this document is where it is. Every state that is not `ready` says
+   something: listed and greyed out with no explanation is the state
+   `stub_reason` was written to prevent, and an un-ingested document lands in
+   exactly the same place. */
+function docMeta(s: NotebookSource): string {
+  if (s.state === "ready") return `module ${s.module_id}`;
+  if (s.state === "stub") return s.stub_reason ?? "no extractable text";
+  if (s.state === "failed") return s.stub_reason ?? "the ingest did not finish";
+  if (s.state === "uploaded") return "kept, and waiting to be read";
+  return "being read now";
+}
 
 const EXT_LABEL = (title: string) => {
   const ext = title.split(".").pop()?.toUpperCase() ?? "";
@@ -49,8 +80,13 @@ export function NotebookScreen() {
     return (modules ?? []).filter((x) => ids.has(x.module_id));
   }, [modules, active]);
 
+  /* A shared Library is read-only. The controls that would write to it are not
+     rendered rather than rendered-and-refused: a disabled Remove still says the
+     Candidate owns this material, and they do not. */
+  const readOnly = active?.visibility === "shared";
   const ready = active?.sources.filter((s) => s.state === "ready") ?? [];
   const stubs = active?.sources.filter((s) => s.state === "stub") ?? [];
+  const failed = active?.sources.filter((s) => s.state === "failed") ?? [];
   const namedTopics = notebookModules.reduce((n, x) => n + x.topic_count, 0);
   const keyedTopics = notebookModules.reduce((n, x) => n + x.ground_truth_topic_count, 0);
 
@@ -216,17 +252,30 @@ export function NotebookScreen() {
             />
           ) : (
             <>
-              <Dropzone
-                onFiles={(files) => m.addFiles.mutate(files)}
-                disabled={false}
-                busy={m.addFiles.isPending}
-              />
+              {readOnly ? (
+                <Panel tone="2" pad={6} className="rule-note">
+                  <Icon name="info" size={16} />
+                  <p className="body-sm dim" style={{ margin: 0 }}>
+                    This Library was imported once and is shared with every Candidate. It is read-only, and
+                    deliberately: the Topics in it are the join key for everybody&rsquo;s record, so removing
+                    one would thin out other people&rsquo;s Evidence without saying so.
+                  </p>
+                </Panel>
+              ) : (
+                <Dropzone
+                  onFiles={(files) => m.addFiles.mutate(files)}
+                  disabled={false}
+                  busy={m.addFiles.isPending}
+                />
+              )}
 
               <div className="row g-4 mt-5" style={{ flexWrap: "wrap" }}>
-                <Button variant="quiet" size="sm" onClick={() => setNoteOpen(true)}>
-                  <Icon name="plus" size={14} />
-                  Paste a note instead
-                </Button>
+                {readOnly ? null : (
+                  <Button variant="quiet" size="sm" onClick={() => setNoteOpen(true)}>
+                    <Icon name="plus" size={14} />
+                    Paste a note instead
+                  </Button>
+                )}
                 {notebooks && notebooks.length > 1 ? (
                   <select
                     className="select"
@@ -236,7 +285,9 @@ export function NotebookScreen() {
                     onChange={(e) => setActiveId(e.target.value)}
                   >
                     {notebooks.map((n) => (
-                      <option key={n.notebook_id} value={n.notebook_id}>{n.title}</option>
+                      <option key={n.notebook_id} value={n.notebook_id}>
+                        {n.visibility === "shared" ? `${n.title} (shared)` : n.title}
+                      </option>
                     ))}
                   </select>
                 ) : null}
@@ -257,31 +308,66 @@ export function NotebookScreen() {
                         <span className="doc-icon" aria-hidden="true">{EXT_LABEL(s.title)}</span>
                         <span style={{ minWidth: 0 }}>
                           <span className="doc-name">{s.title}</span>
-                          <span className="doc-meta">
-                            {s.state === "stub"
-                              ? (s.stub_reason ?? "no extractable text")
-                              : `module ${s.module_id}`}
-                          </span>
+                          <span className="doc-meta">{docMeta(s)}</span>
+                          {s.state === "ingesting" || s.state === "uploaded" ? (
+                            <span className="stack g-2 mt-2" style={{ maxWidth: 260 }}>
+                              {/* Work done against work found, never a spinner:
+                                  forty seconds of spinner is indistinguishable
+                                  from a hang, and which of the two it is happens
+                                  to be the only thing the reader wants. */}
+                              <Meter
+                                value={s.progress_total > 0 ? s.progress_done / s.progress_total : 0}
+                                label={`Reading ${s.title}`}
+                              />
+                              <span className="caption">
+                                {s.progress_done} of {s.progress_total} sections
+                                {s.since_progress_seconds !== null && s.since_progress_seconds > 20
+                                  ? ` · nothing new for ${Math.round(s.since_progress_seconds)}s`
+                                  : ""}
+                              </span>
+                            </span>
+                          ) : null}
                         </span>
                         <span className="row g-4">
-                          <Tag tone={s.state === "stub" ? "warn" : "ok"}>
-                            {s.state === "stub" ? "Unusable" : "Ready"}
-                          </Tag>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            icon
-                            aria-label={`Remove ${s.title}`}
-                            onClick={() => setPendingDelete(s)}
-                          >
-                            <Icon name="trash" size={14} />
-                          </Button>
+                          <Tag tone={STATE_TONE[s.state]}>{STATE_LABEL[s.state]}</Tag>
+                          {s.state === "failed" && !readOnly ? (
+                            <Button
+                              variant="quiet"
+                              size="sm"
+                              loading={m.retrySource.isPending}
+                              onClick={() => m.retrySource.mutate({ sourceId: s.source_id, title: s.title })}
+                            >
+                              Retry
+                            </Button>
+                          ) : null}
+                          {readOnly ? null : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              icon
+                              aria-label={`Remove ${s.title}`}
+                              onClick={() => setPendingDelete(s)}
+                            >
+                              <Icon name="trash" size={14} />
+                            </Button>
+                          )}
                         </span>
                       </div>
                     </li>
                   ))}
                 </ul>
               )}
+
+              {failed.length > 0 ? (
+                <Panel tone="2" pad={6} className="mt-6 rule-note" role="alert">
+                  <Icon name="info" size={16} />
+                  <p className="body-sm dim" style={{ margin: 0 }}>
+                    {failed.length} document{failed.length === 1 ? "" : "s"} could not be read through to the
+                    end. The upload survived it, so Retry re-embeds what is already stored rather than asking
+                    you for the file again.
+                  </p>
+                </Panel>
+              ) : null}
 
               {stubs.length > 0 ? (
                 <Panel tone="2" pad={6} className="mt-6 rule-note">

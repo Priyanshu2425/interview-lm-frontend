@@ -165,6 +165,35 @@ for (const theme of THEMES) {
   await ctx.close();
 }
 
+/* The middle width. ISSUE-0020 asks for 390, 768 and 1440; the first and last
+   are covered above, and a tablet is where a two-column workbench either folds
+   or does not. Measured rather than eyeballed: overflow is objective, and the
+   part of a fidelity comparison a person still has to do is the part that is
+   not. */
+{
+  const ctx = await browser.newContext({ viewport: { width: 768, height: 1024 } });
+  const p = await ctx.newPage();
+  await p.goto(BASE + "/mastery", { waitUntil: "domcontentloaded" });
+  await p.evaluate(() => {
+    localStorage.setItem("ilm.candidate.v1", "cand_shoot_demo");
+    sessionStorage.setItem("ilm.operator.v1", "dev-operator-token");
+  });
+  for (const route of ROUTES) {
+    await p.goto(BASE + route, { waitUntil: "networkidle" });
+    await p.waitForTimeout(250);
+    const r = await p.evaluate(AUDIT);
+    const over = await p.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    if (over > 1) { failures++; console.log(`✗ 768px ${route} — page scrolls sideways by ${over}px`); }
+    if (r.contrast.length) {
+      failures += r.contrast.length;
+      console.log(`✗ 768px ${route} — ${r.contrast.length} contrast`);
+      for (const c of r.contrast.slice(0, 4)) console.log(`    ${c.ratio} (need ${c.need}) ${c.px}px "${c.text}"`);
+    }
+  }
+  await ctx.close();
+}
+
 /* Narrow viewport: nothing may push the page sideways. */
 {
   const ctx = await browser.newContext({ viewport: { width: 320, height: 700 } });

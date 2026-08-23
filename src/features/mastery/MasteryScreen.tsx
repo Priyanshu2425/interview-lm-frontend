@@ -4,7 +4,7 @@ import {
   ButtonLink, Chip, EmptyState, ErrorState, Icon, Panel, SkeletonLines, Stat, TextField,
 } from "@/ui";
 import type { Band, TopicReading } from "@/shared/types";
-import { useConfidence, useUntestedModules } from "./hooks/useMastery";
+import { useConfidence, useCoverageStanding, useUntestedModules } from "./hooks/useMastery";
 import { CorpusMap } from "./components/CorpusMap";
 import { TopicRow } from "./components/TopicRow";
 import { TopicDetail } from "./components/TopicDetail";
@@ -24,6 +24,7 @@ const FILTER_BANDS: Record<Exclude<Filter, "all">, Band> = {
 export function MasteryScreen() {
   const { data, isPending, error } = useConfidence();
   const { data: untestedModules } = useUntestedModules();
+  const { data: coverageStanding } = useCoverageStanding();
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -109,6 +110,20 @@ export function MasteryScreen() {
                 note="Graded answers, weighted by how they were graded."
               />
             </div>
+
+            {/* Coverage compared as Coverage, and only as Coverage. It sits
+                beside the Coverage readings and nowhere near a Mastery figure,
+                because the thing this product refuses is the two of them fused
+                into one position (ADR-0022). */}
+            {coverageStanding && coverageStanding.percentile !== null ? (
+              <p className="caption mt-5">
+                Examined on {coverageStanding.topics_examined} of{" "}
+                {coverageStanding.topics_available} shared Topics — more than{" "}
+                {coverageStanding.percentile}% of {coverageStanding.cohort} Candidates.
+                A count of classes opened, compared with other counts. It says nothing
+                about how well any of them went.
+              </p>
+            ) : null}
 
             <Panel pad={7} className="mt-8">
               <CorpusMap

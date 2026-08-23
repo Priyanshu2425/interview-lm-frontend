@@ -49,3 +49,23 @@ describe("BetaCurve", () => {
     expect(container.querySelector(".beta-mean")).not.toBeNull();
   });
 });
+
+/* ISSUE-0020's colour rule, at the one place it was being broken: a band drawn
+   as a tint says nothing to a greyscale screen or a screen reader. */
+describe("a band is never carried by colour alone", () => {
+  it("says which band a reportable figure falls in", () => {
+    render(<Reading band="firm_weak" label="Looks weak" mastery={0.41} />);
+    expect(screen.getByText("Looks weak")).toBeInTheDocument();
+  });
+
+  it("takes the word from the server rather than deriving it from the figure", () => {
+    /* The same number in two bands. If the surface were computing the band it
+       would have to disagree with one of these — and a second implementation of
+       the Evidence Floor is exactly what ADR-0009 refuses. */
+    const { unmount } = render(<Reading band="firm_weak" label="Looks weak" mastery={0.6} />);
+    expect(screen.getByText("Looks weak")).toBeInTheDocument();
+    unmount();
+    render(<Reading band="firm_strong" label="Looks solid" mastery={0.6} />);
+    expect(screen.getByText("Looks solid")).toBeInTheDocument();
+  });
+});

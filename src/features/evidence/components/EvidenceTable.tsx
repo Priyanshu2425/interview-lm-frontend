@@ -4,6 +4,39 @@ import { Coverage, EmptyState, Icon, Reading, Tag } from "@/ui";
 import { bandClass } from "@/shared/utils/band";
 import { GRADING_MODE_SHORT, GRADING_MODE_WEIGHT, credits as fmtCredits } from "@/shared/utils/format";
 import type { EvidenceRow } from "../hooks/useSessionRecord";
+import { useTopicStanding } from "../hooks/useSessionRecord";
+
+/* Where the Candidate stands on this one Topic (ADR-0022).
+
+   Inside the drawer, for one Topic, opened deliberately. Not a column: a column
+   of ranks can be read down the page, and a list of Topics ordered by where you
+   stand on them is Topic recommendation, which does not exist here.
+
+   Every unavailable case renders the API's own sentence rather than a composed
+   one — below the Evidence Floor, below the Cohort Floor, or a Library nobody
+   else holds are three different facts and the surface must not flatten them. */
+function Standing({ topicId }: { topicId: string }) {
+  const { data } = useTopicStanding(topicId);
+  if (!data) return null;
+  return (
+    <div className="hair-t" style={{ paddingTop: "var(--s-5)" }}>
+      <span className="eyebrow">Where you stand on this Topic</span>
+      {data.rank === null ? (
+        <p className="caption mt-4" style={{ margin: 0 }}>{data.reason}</p>
+      ) : (
+        <p className="body-sm mt-4" style={{ margin: 0 }}>
+          <strong className="mono">
+            #{data.rank}{data.shared ? "=" : ""}
+          </strong>{" "}
+          of {data.cohort} Candidates examined on this Topic.
+          {data.shared
+            ? " Shared, because the posteriors overlap — the measurement cannot separate you."
+            : ""}
+        </p>
+      )}
+    </div>
+  );
+}
 
 /* One row per Topic Visit, because the Topic Visit is the unit of evidence:
    one Visit yields exactly one score and exactly one write, however many
@@ -138,6 +171,7 @@ export function EvidenceTable({ rows, route }: { rows: EvidenceRow[]; route: Pay
                               ? "Still below the Evidence Floor after this Visit. Untested is a fact about the evidence, not a score."
                               : "Coverage and Mastery are two readings taken from one distribution. They are never fused."}
                           </p>
+                          <Standing topicId={row.topic_id} />
                         </div>
                       </div>
                     </td>

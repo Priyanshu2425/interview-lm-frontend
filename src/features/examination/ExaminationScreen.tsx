@@ -187,7 +187,10 @@ export function ExaminationScreen() {
                 total={Math.max(exam.visitsSeen, exam.visitsScored + 1)}
               />
             </div>
-            <h1 className="h2">{topicTitle}</h1>
+            {/* Not a second heading: the topbar carries the page's h1 on every
+                width, and this restates it where a phone has room. Two headings
+                with identical text is noise to anyone reading by structure. */}
+            <p className="h2" style={{ margin: 0 }}>{topicTitle}</p>
           </div>
         ) : null}
 

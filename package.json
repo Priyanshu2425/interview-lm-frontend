@@ -1,9 +1,9 @@
 {
-  "name": "cortex-interviewer-surface",
+  "name": "interview-lm-surface",
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Candidate and Operator surface for the Cortex Interviewer",
+  "description": "Candidate and Operator surface for the InterviewLM",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -13,6 +13,8 @@
     "test": "vitest run",
     "test:e2e": "node tests/run.mjs",
     "audit": "node tools/audit.mjs",
+    "a11y": "node tools/a11y.mjs",
+    "fidelity": "node tools/fidelity.mjs",
     "shoot": "node tools/shoot.mjs",
     "scenes": "node tools/scenes.mjs",
     "verify": "npm run typecheck && npm run lint && npm run test && npm run build"

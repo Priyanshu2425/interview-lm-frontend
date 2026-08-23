@@ -1,9 +1,14 @@
 import { api } from "../api-client";
 import { endpoints } from "../endpoints";
-import type { Notebook, SourceAdded } from "@/shared/types";
+import type { Notebook, SourceUploaded } from "@/shared/types";
 
 export const notebookService = {
   list: (candidateId: string) => api.request<Notebook[]>(endpoints.notebooks.list(candidateId)),
+
+  /* One Library, with each document's state and progress. This is what the
+     surface polls while an ingest runs — a plain read of rows the worker is
+     updating, so it costs nothing and cannot itself stall. */
+  read: (notebookId: string) => api.request<Notebook>(endpoints.notebooks.one(notebookId)),
 
   create: (candidateId: string, title: string) =>
     api.request<Notebook>(endpoints.notebooks.create(), {
@@ -18,7 +23,7 @@ export const notebookService = {
     mediaType = "text/markdown",
     url = "",
   ) =>
-    api.request<SourceAdded>(endpoints.notebooks.sources(notebookId), {
+    api.request<SourceUploaded>(endpoints.notebooks.sources(notebookId), {
       method: "POST",
       body: { title, text, media_type: mediaType, url },
     }),
@@ -27,8 +32,15 @@ export const notebookService = {
     const form = new FormData();
     form.append("file", file, file.name);
     form.append("title", file.name);
-    return api.upload<SourceAdded>(endpoints.notebooks.files(notebookId), form);
+    return api.upload<SourceUploaded>(endpoints.notebooks.files(notebookId), form);
   },
+
+  /* Re-ingest a failed document. The bytes are already stored, so this costs
+     the embedding again and nothing else — it never re-uploads. */
+  retry: (notebookId: string, sourceId: string) =>
+    api.request<{ source_id: string; state: string }>(
+      endpoints.notebooks.retry(notebookId, sourceId), { method: "POST" },
+    ),
 
   /* One Source out. Its Topics retire; every other Module is untouched. */
   deleteSource: (notebookId: string, sourceId: string) =>

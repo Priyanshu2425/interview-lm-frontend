@@ -12,6 +12,8 @@ export const queryKeys = {
       [...queryKeys.corpus.all, "modules", track ?? "all", candidateId] as const,
     scope: (moduleIds: readonly string[]) =>
       [...queryKeys.corpus.all, "scope", [...moduleIds].sort().join(",")] as const,
+    scopeRelated: (moduleIds: readonly string[]) =>
+      [...queryKeys.corpus.all, "scope-related", [...moduleIds].sort().join(",")] as const,
   },
 
   session: {
@@ -26,11 +28,16 @@ export const queryKeys = {
     confidence: (id: string) => [...queryKeys.candidate.all, id, "confidence"] as const,
     weakest: (id: string) => [...queryKeys.candidate.all, id, "weakest"] as const,
     credits: (id: string) => [...queryKeys.candidate.all, id, "credits"] as const,
+    topicStanding: (id: string, topicId: string) =>
+      [...queryKeys.candidate.all, id, "standing", topicId] as const,
+    coverageStanding: (id: string) =>
+      [...queryKeys.candidate.all, id, "coverage-standing"] as const,
   },
 
   notebooks: {
     all: ["notebooks"] as const,
     list: (candidateId: string) => [...queryKeys.notebooks.all, candidateId] as const,
+    one: (notebookId: string) => [...queryKeys.notebooks.all, "one", notebookId] as const,
   },
 
   providers: { prices: ["providers", "prices"] as const },

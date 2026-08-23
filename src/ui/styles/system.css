@@ -508,7 +508,21 @@ table { border-collapse: collapse; width: 100%; }
 .table tbody tr[data-clickable]:hover td { background: var(--surface-2); }
 .cell-clip { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+/* A dense table scrolls inside its own container, and `overflow-x` alone does
+   not achieve that. A grid or flex item's `min-width` is `auto`, which means
+   "as wide as my content" — so the container grew to the table's 760px and took
+   the page sideways with it. `min-width: 0` is what lets it shrink and the
+   table scroll inside it, which is the behaviour the class was always named
+   for. Found at 390px on the Session record (ISSUE-0020). */
+.table-scroll {
+  overflow-x: auto; -webkit-overflow-scrolling: touch; min-width: 0; max-width: 100%;
+  /* The containing block for anything absolutely positioned inside, which is
+     what makes `overflow-x` actually clip it. Without this, a screen-reader-only
+     span deep in a 760px table escapes to the nearest positioned ancestor —
+     outside the scroller — and takes the whole page sideways at 390px. Found by
+     the fidelity pass; the span itself was correct. */
+  position: relative;
+}
 
 /* ----------------------------------------------------------- feedback ---- */
 

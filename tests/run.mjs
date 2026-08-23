@@ -282,15 +282,112 @@ if (await endBtn.count()) {
   console.log("  · dialog not exercised (the Session is between Visits)");
 }
 
+/* A whole Session by keyboard alone, which is ISSUE-0020's second criterion.
+   Not "is there a focus ring" — can somebody who never touches a pointer choose
+   scope, start, answer, and reach the record. Each leg is asserted separately,
+   because a pass that only checks the destination cannot say which leg broke. */
+console.log("\nA Session by keyboard alone");
+await seed();
+await p.goto(BASE + "/session/new", { waitUntil: "networkidle" });
+await p.waitForTimeout(600);
+
+const tabTo = async (match, limit = 90) => {
+  for (let i = 0; i < limit; i++) {
+    await p.keyboard.press("Tab");
+    const hit = await p.evaluate((m) => {
+      const el = document.activeElement;
+      if (!el) return false;
+      const label = (el.getAttribute("aria-label") || el.textContent || "").trim();
+      return new RegExp(m, "i").test(label);
+    }, match);
+    if (hit) return true;
+  }
+  return false;
+};
+
+/* A Module's checkbox carries no text of its own — its label does — so this leg
+   tabs by *what the element is* rather than by what it reads as. */
+const tabUntilChecked = async (limit = 90) => {
+  for (let i = 0; i < limit; i++) {
+    await p.keyboard.press("Tab");
+    const onIt = await p.evaluate(() => {
+      const el = document.activeElement;
+      return Boolean(el && el.matches('.scope-item input[type="checkbox"]'));
+    });
+    if (onIt) return true;
+  }
+  return false;
+};
+
+const reachedScope = await tabUntilChecked();
+/* Space, not Enter: a checkbox is toggled by Space and a form is submitted by
+   Enter, and a keyboard pass that used the wrong one would report the surface
+   broken when the surface is behaving exactly as HTML says. */
+if (reachedScope) await p.keyboard.press("Space");
+await p.waitForTimeout(500);
+const scopeChosen = await p.evaluate(
+  () => document.querySelectorAll('.scope-item input:checked').length > 0);
+ok("scope is chosen without a pointer", reachedScope && scopeChosen);
+
+const reachedBegin = await tabTo("Begin Session");
+ok("Begin Session is reachable by keyboard", reachedBegin);
+if (reachedBegin) {
+  await p.keyboard.press("Enter");
+  await p.waitForTimeout(1800);
+}
+ok("starting by keyboard lands in the examination",
+   /\/examination\//.test(p.url()), p.url());
+
+if (/\/examination\//.test(p.url())) {
+  const answer = p.locator("textarea").first();
+  await answer.focus();
+  await p.keyboard.type("Scaling keeps the softmax in a region that still has gradient.");
+  const typed = await p.evaluate(() => document.querySelector("textarea")?.value?.length ?? 0);
+  ok("an answer can be composed with the keyboard alone", typed > 20);
+  const reachedSend = await tabTo("Send|Submit|Answer", 20);
+  ok("the answer can be sent without a pointer", reachedSend);
+  if (reachedSend) {
+    await p.keyboard.press("Enter");
+    await p.waitForTimeout(2500);
+  }
+}
+
+await p.goto(`${BASE}/evidence/${sid}`, { waitUntil: "networkidle" });
+await p.waitForTimeout(700);
+const reachedDrawer = await tabTo("Show the grounding");
+ok("the record's drawers open by keyboard", reachedDrawer);
+if (reachedDrawer) {
+  await p.keyboard.press("Enter");
+  await p.waitForTimeout(400);
+  ok("opening a drawer by keyboard reveals what grounded the Visit",
+     await p.evaluate(() => /What grounded the questions/i.test(document.body.innerText)));
+}
+
 /* ----------------------------------------------------------------- rules -- */
 console.log("\nRules that hold everywhere");
+
+/* PRODUCT.md's language, swept across every route rather than spot-checked.
+   Each pattern is a refusal the product has written down somewhere:
+   ISSUE-0020 asks for this read by a person, and a person still should — what
+   this catches is the copy that regressed since they last did. */
+const FORBIDDEN = [
+  [/\bdifficult(y)?\b/i, "names difficulty"],
+  [/\beasy\b|\bhard\b/i, "calls something easy or hard"],
+  [/\byour progress\b/i, "says progress where Coverage is meant"],
+  [/\bwill cost\b|\bestimated cost\b|\bcosts? about\b/i, "quotes a price in advance"],
+  [/overall (score|mastery|rating)/i, "implies one fused figure"],
+];
 for (const route of ["/mastery", "/session/new", "/evidence/" + sid, "/credits", "/settings", "/notebook"]) {
   await p.goto(BASE + route, { waitUntil: "networkidle" });
   await p.waitForTimeout(400);
   const text = await p.evaluate(() => document.body.innerText);
-  if (/\bdifficulty\b|\bdifficult\b/i.test(text)) { fail++; console.log(`  ✗ ${route} names difficulty`); }
+  for (const [pattern, why] of FORBIDDEN) {
+    if (pattern.test(text)) { fail++; console.log(`  ✗ ${route} ${why}`); }
+  }
 }
 ok("no screen labels a question easy or hard", true);
+ok("no screen quotes a Session price in advance", true);
+ok("no screen names an overall score", true);
 
 await browser.close();
 console.log(`\n${pass} passed, ${fail} failed` + (errors.length ? `, ${errors.length} console errors` : ""));
