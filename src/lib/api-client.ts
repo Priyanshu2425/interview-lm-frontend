@@ -59,14 +59,24 @@ function codeOf(data: unknown): string | null {
   return null;
 }
 
+/* Marks a body that did not parse as JSON, so a success can tell the
+   difference between "the API said this" and "something else answered". */
+const UNPARSED = Symbol("unparsed");
+
 async function parse(response: Response): Promise<unknown> {
   const text = await response.text();
   if (!text) return null;
   try {
     return JSON.parse(text) as unknown;
   } catch {
-    return { detail: text };
+    /* Kept for the message — an HTML error page from a proxy still says
+       something useful — but flagged, because it is not data. */
+    return { detail: text.slice(0, 200), [UNPARSED]: true };
   }
+}
+
+function unparsed(data: unknown): boolean {
+  return typeof data === "object" && data !== null && UNPARSED in data;
 }
 
 export interface ClientOptions {
@@ -89,6 +99,24 @@ export function createApiClient(baseUrl: string, options: ClientOptions = {}): A
     const data = await parse(response);
     if (!response.ok) {
       throw new ApiError(response.status, messageOf(data, fallback), data, codeOf(data));
+    }
+    /* A 200 that is not JSON is not a success, whatever the status line says.
+
+       This is not hypothetical: a surface built with no VITE_API_URL calls its
+       own origin, and a static host answers every unknown path with the SPA
+       shell at 200. The shell parsed as `{detail: "<!doctype html>…"}` and was
+       handed to screens expecting an array, which failed later and elsewhere
+       as "filter is not a function" — an error naming neither the request nor
+       the reason. Refused here, where the cause is still visible. */
+    if (unparsed(data)) {
+      throw new ApiError(
+        response.status,
+        "The API answered with something that is not JSON. If this surface was "
+        + "built without VITE_API_URL it is calling itself, and the page you are "
+        + "looking at is the reply.",
+        data,
+        "not_an_api",
+      );
     }
     return data as T;
   }

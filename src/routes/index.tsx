@@ -7,6 +7,7 @@ import { ExaminationScreen } from "@/features/examination";
 import { EvidenceScreen } from "@/features/evidence";
 import { NotebookScreen } from "@/features/notebook";
 import { NotFoundScreen } from "./NotFoundScreen";
+import { RouteError } from "./RouteError";
 import {
   ForgotPasswordScreen, LoginScreen, RegisterScreen, RequireSession,
   ResetPasswordScreen, VerifyEmailScreen,
@@ -40,6 +41,9 @@ export const router = createBrowserRouter([
     children: [{
     path: "/",
     element: <RootLayout />,
+    /* Every screen behind the session shares one. A route without an
+       errorElement shows React Router's developer screen to a Candidate. */
+    errorElement: <RouteError />,
     children: [
       { index: true, element: <Navigate to="/mastery" replace /> },
       { path: "mastery", element: <MasteryScreen /> },
