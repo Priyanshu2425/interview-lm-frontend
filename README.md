@@ -9,8 +9,12 @@ deployable: it holds no invariant.
 
 ## Running it
 
-The backend serves `dist/` as static files, so there is one origin and no CORS
-to configure.
+The backend serves `dist/` as static files, so locally there is one origin and
+no CORS to configure. That is still the default everywhere — `ALLOWED_ORIGINS`
+on the API and `VITE_API_URL` here are both empty until somebody splits them,
+and empty is this deployment exactly as described. The deployed surface *is*
+split: it is served from Cloudflare Pages and reaches the API cross-origin,
+which is what ADR-0020 records and what those two variables are for.
 
 ```bash
 npm install
@@ -18,7 +22,7 @@ npm run build
 
 # from the parent project
 docker run -d --name cortex-pg -e POSTGRES_PASSWORD=cortex \
-  -e POSTGRES_USER=cortex -e POSTGRES_DB=cortex -p 55432:5432 postgres:16-alpine
+  -e POSTGRES_USER=cortex -e POSTGRES_DB=cortex -p 55432:5432 pgvector/pgvector:pg16
 .venv/bin/uvicorn interviewer.api.app:app --port 8000
 # then open http://127.0.0.1:8000/
 ```
@@ -29,6 +33,66 @@ the browser's point of view.
 
 Set `INTERVIEWER_FAKE_MODEL=1` on the API to run the whole loop against a
 scripted provider: deterministic, no network, real metering.
+
+## Signing in while developing
+
+**Run this once per machine, then `npm run dev`:**
+
+```bash
+../scripts/dev-auth-setup.sh
+```
+
+It is idempotent — it checks each step before acting, so running it again on a
+machine that is already set up prints what is already true and changes nothing.
+It asks for your password twice at most: once for the local certificate
+authority, once for `/etc/hosts`, and only if those are not already done.
+
+Then:
+
+```bash
+npm run dev                               # serves https://interview-lm.dev.buildspacelabs.com:5173
+```
+
+### What it sets up, and why
+
+Identity is held by [Gatehouse](https://auth.buildspacelabs.com), and its refresh
+cookie is `httpOnly`, `Secure` and `SameSite=Lax`. Two of those decide how this
+surface has to be served locally, and getting either wrong produces the same
+failure: **sign-in appears to work and the session is gone by the next reload**,
+with nothing logged anywhere.
+
+| | |
+|---|---|
+| `SameSite=Lax` | needs this surface and the auth host to be **one site**. `interview-lm.dev.buildspacelabs.com` and `auth.buildspacelabs.com` share `buildspacelabs.com`, so the cookie is sent. This is why the dev server is not on `localhost`. |
+| `Secure` | needs **https**. That is why `npm run dev` serves TLS with a locally-trusted certificate rather than plain http. |
+| the hostname | is `interview-lm.dev.buildspacelabs.com` because in Gatehouse an origin belongs to exactly one tenant, so every product's developers would otherwise be fighting over `localhost:5173`. The label is this tenant's slug. It resolves to `127.0.0.1`; nothing leaves the machine. |
+
+`vite.config.ts` reads the certificate from `~/.local/share/gatehouse-dev-certs/`
+and **falls back to plain http with a warning if it is not there** — so a
+teammate without one still gets a dev server that starts, and only signing in is
+broken.
+
+### When something is wrong
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `getaddrinfo ENOTFOUND interview-lm.dev.buildspacelabs.com` | the name is not resolving on this machine — usually a stale macOS resolver cache, sometimes a resolver that refuses loopback answers for public names | re-run `../scripts/dev-auth-setup.sh`; it adds an `/etc/hosts` entry |
+| Browser warns the certificate is untrusted | the local CA is not in the system trust store | `mkcert -install` |
+| Sign-in works, then the member is signed out on reload | the page is on plain http, so the `Secure` cookie was never sent | check `npm run dev` printed an `https://` URL, not `http://` |
+| CORS refusal the page reads as a network error | this origin is not registered against the tenant | step 5 of the script prints the exact command for an operator |
+| Port already in use | `strictPort` is deliberate — a silent move to another port ends as an unreadable CORS error | free the port rather than changing it; the registered origin names this one |
+
+### Why not just use plain http on localhost
+
+Gatehouse can put a tenant in **token mode**, where the refresh token is returned
+in the response body instead of a cookie. That exists for front ends on
+`*.pages.dev` or `*.vercel.app`, which are their own site to a browser and can
+never be same-site with any auth host — for them there is no alternative.
+
+This tenant is not one of those. Choosing token mode here would permanently
+weaken the session protection of real members in production to save a
+certificate on one laptop, and Gatehouse prints a note at every deploy naming
+tenants that did exactly that.
 
 ## Layout
 
