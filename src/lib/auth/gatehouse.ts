@@ -13,11 +13,13 @@
       and a request naming none is refused with 400 before authentication is
       considered at all.
 
-   3. Refresh is serial. Refresh tokens rotate on every use, and presenting a
-      consumed one is treated as theft: the whole session chain is revoked and
-      the member is signed out everywhere. Two concurrent 401s must therefore
-      queue behind one in-flight refresh — the loser of a race would present a
-      token the winner already spent. */
+   3. Refresh is serial across ALL tabs. Refresh tokens rotate on every use,
+      and presenting a consumed one is treated as theft: the whole session chain
+      is revoked and the member is signed out everywhere. Two concurrent 401s
+      from different tabs must therefore coordinate — the loser of a race would
+      present a token the winner already spent. We use a localStorage lock
+      (cross-tab) and an in-memory promise (intra-tab) to guarantee at most one
+      refresh is in flight across the entire browser at any time. */
 
 const AUTH = (import.meta.env.VITE_AUTH_URL ?? "https://auth.buildspacelabs.com").replace(/\/$/, "");
 const SLUG = import.meta.env.VITE_APP_SLUG ?? "interview-lm";
@@ -45,10 +47,6 @@ export interface TokenPair {
    on this page can read it, including one somebody injected. */
 let accessToken: string | null = null;
 let userId: string | null = null;
-
-/* The single in-flight refresh. Not a lock — a promise everybody awaits, so a
-   burst of 401s produces one call to Gatehouse and one rotation. */
-let refreshing: Promise<string | null> | null = null;
 
 const listeners = new Set<() => void>();
 
@@ -113,20 +111,154 @@ export async function signOut(): Promise<void> {
     /* Forgotten locally whatever Gatehouse said. A network failure on the way
        out must not leave somebody looking signed in. */
     forget();
+    releaseLock();
   }
 }
 
-/* One refresh at a time, and everybody gets the same answer. */
-export function refresh(): Promise<string | null> {
-  refreshing ??= call<TokenPair>("/auth/refresh")
-    .then((pair) => remember(pair).access_token)
-    .catch(() => {
+/* ── Cross-tab refresh coordination ────────────────────────────────────────
+
+   Refresh tokens rotate on every use, and Gatehouse treats a second use of a
+   consumed token as theft: the entire session chain is revoked. This means at
+   most ONE refresh may be in flight across ALL open tabs at any time.
+
+   The in-memory `refreshing` promise handles bursts within one tab. For
+   multiple tabs we use a localStorage lock as a cross-tab mutex:
+
+   - To refresh, a tab writes `{ tabId, ts }` to localStorage under `LOCK_KEY`.
+   - If the lock already exists and is fresh (< 30 s), the tab waits on a
+     BroadcastChannel for the result instead of refreshing itself.
+   - The refreshing tab broadcasts the result when done; waiting tabs pick up
+     the new token from the message.
+   - A stale lock (> 30 s) is assumed dead (tab crashed) and overwritten.
+   - On sign-out the lock is released so other tabs can refresh immediately. */
+
+const LOCK_KEY = "__gh_refresh_lock";
+const CHANNEL_NAME = "__gh_refresh";
+const LOCK_TTL_MS = 30_000;
+const WAIT_TIMEOUT_MS = 10_000;
+
+let tabId: string | null = null;
+function getTabId(): string {
+  if (tabId === null) tabId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return tabId;
+}
+
+interface Lock {
+  tabId: string;
+  ts: number;
+}
+
+function readLock(): Lock | null {
+  try {
+    const raw = localStorage.getItem(LOCK_KEY);
+    return raw ? (JSON.parse(raw) as Lock) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLock(): void {
+  localStorage.setItem(LOCK_KEY, JSON.stringify({ tabId: getTabId(), ts: Date.now() }));
+}
+
+function releaseLock(): void {
+  try {
+    const lock = readLock();
+    if (lock?.tabId === getTabId()) localStorage.removeItem(LOCK_KEY);
+  } catch { /* storage failures are non-fatal */ }
+}
+
+function lockIsStale(): boolean {
+  const lock = readLock();
+  return lock === null || Date.now() - lock.ts > LOCK_TTL_MS;
+}
+
+/* The single in-tab in-flight refresh. A burst of 401s within one tab queues
+   behind this promise. */
+let refreshing: Promise<string | null> | null = null;
+
+/* Wait for another tab to finish its refresh, with a timeout. Returns the new
+   token if the other tab succeeded, or null if it failed / timed out. */
+function waitForOtherRefresh(): Promise<string | null> {
+  return new Promise((resolve) => {
+    const channel = new BroadcastChannel(CHANNEL_NAME);
+    const cleanup = () => {
+      clearTimeout(timeout);
+      channel.close();
+    };
+    channel.onmessage = (event: MessageEvent) => {
+      const msg = event.data as { type: string; accessToken?: string };
+      if (msg.type === "refreshed" && msg.accessToken) {
+        cleanup();
+        resolve(msg.accessToken);
+      } else if (msg.type === "failed") {
+        cleanup();
+        resolve(null);
+      }
+    };
+    const timeout = setTimeout(() => {
+      cleanup();
+      resolve(null);
+    }, WAIT_TIMEOUT_MS);
+  });
+}
+
+/* Perform the actual refresh call to Gatehouse. */
+async function doRefresh(): Promise<TokenPair> {
+  return call<TokenPair>("/auth/refresh");
+}
+
+/* One refresh at a time, coordinated across all tabs.
+
+   Returns the new access token, or null if the session is dead. */
+export async function refresh(): Promise<string | null> {
+  /* Fast path: within this tab, a refresh is already in flight. */
+  if (refreshing !== null) return refreshing;
+
+  refreshing = (async () => {
+    /* If another tab holds a fresh lock, wait for it instead of refreshing. */
+    if (!lockIsStale()) {
+      const token = await waitForOtherRefresh();
+      if (token !== null) {
+        /* The other tab already broadcast the new token; pick it up. */
+        accessToken = token;
+        announce();
+        return token;
+      }
+      /* The other tab's refresh failed or timed out. Try to take the lock. */
+      if (!lockIsStale()) {
+        /* Lock is still held and fresh — we cannot refresh either. */
+        forget();
+        return null;
+      }
+    }
+
+    /* Acquire the cross-tab lock and refresh. */
+    writeLock();
+    try {
+      const pair = await doRefresh();
+      remember(pair);
+      /* Broadcast the success so every waiting tab picks up the new token
+         without spending another refresh token. */
+      try {
+        new BroadcastChannel(CHANNEL_NAME).postMessage({
+          type: "refreshed",
+          accessToken: pair.access_token,
+        });
+      } catch { /* broadcast failures are non-fatal */ }
+      return pair.access_token;
+    } catch {
       forget();
+      try {
+        new BroadcastChannel(CHANNEL_NAME).postMessage({ type: "failed" });
+      } catch { /* broadcast failures are non-fatal */ }
       return null;
-    })
-    .finally(() => {
+    } finally {
+      releaseLock();
       refreshing = null;
-    });
+    }
+  })();
+
   return refreshing;
 }
 

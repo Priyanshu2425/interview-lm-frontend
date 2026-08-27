@@ -1,6 +1,43 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+/* The development certificate, if this machine has one.
+ *
+ * Gatehouse's refresh cookie is `Secure`, so a browser will not send it over plain
+ * http — and this tenant's front end is same-site with the auth host, so the cookie
+ * is exactly what it should be using. https locally is what makes that work, and it
+ * needs a certificate the browser trusts for this name.
+ *
+ *   brew install mkcert && mkcert -install
+ *   mkdir -p ~/.local/share/gatehouse-dev-certs
+ *   cd ~/.local/share/gatehouse-dev-certs
+ *   mkcert -cert-file dev.buildspacelabs.com.pem \
+ *          -key-file  dev.buildspacelabs.com-key.pem \
+ *          "*.dev.buildspacelabs.com" "dev.buildspacelabs.com"
+ *
+ * Absent, the server still starts on plain http. Everything but signing in works,
+ * and the sign-in failure is then one missing certificate rather than a dev server
+ * that would not come up at all.
+ */
+function developmentCertificate() {
+  const dir = join(homedir(), ".local", "share", "gatehouse-dev-certs");
+  const key = join(dir, "dev.buildspacelabs.com-key.pem");
+  const cert = join(dir, "dev.buildspacelabs.com.pem");
+  if (!existsSync(key) || !existsSync(cert)) {
+    console.warn(
+      "\n  No development certificate found, so this server is plain http and the\n" +
+      "  refresh cookie will not be sent — sign-in will appear to work and the\n" +
+      "  session will vanish on the next reload. See the README.\n",
+    );
+    return undefined;
+  }
+  return { key: readFileSync(key), cert: readFileSync(cert) };
+}
+
 
 /* The API and the surface share an origin in production: FastAPI mounts
    `dist/` at `/`. In dev, Vite proxies `/v1` so there is still exactly one
@@ -11,7 +48,19 @@ export default defineConfig({
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
   server: {
+    /* Gatehouse gives every tenant its own development hostname, because an origin
+       belongs to exactly one tenant and every product's developers would otherwise
+       want `localhost:5173`. The label is this tenant's slug; the name resolves to
+       127.0.0.1 and nothing leaves the machine.
+
+       `strictPort` matters here: without it a busy 5173 moves Vite to 5174 — which
+       is Attest's — and the failure arrives as an unreadable CORS refusal instead of
+       one line from the dev server. */
+    host: "interview-lm.dev.buildspacelabs.com",
+    https: developmentCertificate(),
     port: 5173,
+    strictPort: true,
+    allowedHosts: ["interview-lm.dev.buildspacelabs.com"],
     proxy: {
       "/v1": { target: process.env.API_ORIGIN ?? "http://127.0.0.1:8000", changeOrigin: true },
     },
