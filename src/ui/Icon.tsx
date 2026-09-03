@@ -34,6 +34,15 @@ const PATHS = {
   trash: <><path d="M3.5 4.5h9M6.5 4.5v-2h3v2M5 4.5l.6 9h4.8l.6-9" /></>,
   key: <><circle cx="5.4" cy="8" r="2.6" /><path d="M8 8h5.5M11.5 8v2.2M13.5 8v1.6" /></>,
   plus: <path d="M8 3.5v9M3.5 8h9" />,
+  /* Answering out loud (ISSUE-0049). The capsule, the arc that catches it and
+     the stand — the shape every device has already taught people to read. */
+  mic: <><path d="M8 2.2a1.9 1.9 0 0 0-1.9 1.9v4a1.9 1.9 0 0 0 3.8 0v-4A1.9 1.9 0 0 0 8 2.2Z" /><path d="M11.6 7.2v.9a3.6 3.6 0 0 1-7.2 0v-.9" /><path d="M8 11.7v2.1" /></>,
+  /* Stroked, not the filled square a media player draws. Every other path here
+     is an outline, and one fill among thirty reads as emphasis nobody meant. */
+  stop: <rect x="4.6" y="4.6" width="6.8" height="6.8" rx="1.6" />,
+  /* Sound arriving. Bars rather than a waveform: at 16px a waveform is a
+     smudge, and this is read as a label beside an engine's name. */
+  level: <path d="M3.4 6.6v2.8M6.1 4.4v7.2M8.9 2.9v10.2M11.7 5.4v5.2" />,
 } as const;
 
 export type IconName = keyof typeof PATHS;

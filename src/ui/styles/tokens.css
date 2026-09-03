@@ -132,6 +132,13 @@
   --warn: oklch(0.812 0.148 78);
   --ok:   oklch(0.770 0.135 158);
 
+  /* A microphone that is open (ISSUE-0049). Deliberately not `--risk`: a
+     Candidate who is being listened to is not in trouble, and the one colour
+     that means "something has gone wrong" should keep meaning only that.
+     Tuned per theme to its own `--risk` lightness, pushed toward the red end,
+     so it reads as the recording red every device has trained people on. */
+  --live: oklch(0.700 0.200 18);
+
   --focus: oklch(0.800 0.150 190);
 
   --judge-bg:   oklch(0.228 0 0);
@@ -178,6 +185,7 @@
   --risk: oklch(0.512 0.208 27);
   --warn: oklch(0.560 0.140 68);
   --ok:   oklch(0.500 0.128 158);
+  --live: oklch(0.520 0.216 18);
 
   --focus: oklch(0.470 0.192 262);
 
@@ -225,6 +233,7 @@
   --risk: oklch(0.505 0.206 27);
   --warn: oklch(0.552 0.136 66);
   --ok:   oklch(0.492 0.124 158);
+  --live: oklch(0.515 0.214 18);
 
   --focus: oklch(0.532 0.118 196);
 
@@ -272,6 +281,7 @@
   --risk: oklch(0.688 0.196 24);
   --warn: oklch(0.822 0.146 80);
   --ok:   oklch(0.782 0.130 160);
+  --live: oklch(0.702 0.204 18);
 
   --focus: oklch(0.900 0.190 122);
 
@@ -318,6 +328,7 @@
   --risk: oklch(0.688 0.192 22);
   --warn: oklch(0.828 0.140 84);
   --ok:   oklch(0.772 0.128 158);
+  --live: oklch(0.700 0.202 16);
 
   --focus: oklch(0.822 0.142 72);
 
