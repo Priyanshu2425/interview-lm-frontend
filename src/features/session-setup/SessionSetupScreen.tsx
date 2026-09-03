@@ -3,17 +3,21 @@ import { PageHeader, Workbench } from "@/shared/components";
 import { ButtonLink, Choice, Icon, Panel, SelectField } from "@/ui";
 import { PROVIDERS, usePreferenceStore } from "@/shared/stores/preferences";
 import { useLatestRunningSession } from "@/shared/stores/sessionHistory";
-import { useModules, useScope, useScopeRelated } from "./hooks/useCorpus";
+import { useCredits } from "@/features/credits";
+import type { PaymentRoute } from "@/shared/types";
+import { useModules, useScope, useScopeRelated } from "./hooks/useSkills";
 import { useStartSession } from "./hooks/useStartSession";
 import { ScopePicker } from "./components/ScopePicker";
 import { TouchedModules } from "./components/TouchedModules";
 import { SessionPreview } from "./components/SessionPreview";
 import { EvidenceRules } from "./components/EvidenceRules";
+import { PaymentRoutePicker } from "./components/PaymentRoutePicker";
+import { duration as fmtDuration } from "@/shared/utils/format";
 
 const DURATIONS = [
   { value: 1500, title: "25 minutes", sub: "A short sitting · soft deadline" },
   { value: 3000, title: "50 minutes", sub: "A full sitting · soft deadline" },
-  { value: 0, title: "Until I stop", sub: "Ends after the Visit in progress" },
+  { value: 0, title: "Until I stop", sub: "Ends after the question in progress" },
 ] as const;
 
 /* An open-ended Session still needs a positive duration on the wire; the
@@ -30,6 +34,16 @@ export function SessionSetupScreen() {
 
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [durationChoice, setDurationChoice] = useState<number>(prefs.defaultDuration);
+  /* Null until the Candidate touches the picker, and null is what goes on the
+     wire — the server then settles it from the Key Vault. Choosing is what
+     turns it into a route this screen is asking for. */
+  const [routeChoice, setRouteChoice] = useState<PaymentRoute | null>(null);
+
+  const { data: credits } = useCredits();
+  const hasKey = Boolean(credits?.byok);
+  /* What the server would settle on if nobody chose. Shown as the selection so
+     the picker never reads as undecided. */
+  const route: PaymentRoute = routeChoice ?? (hasKey ? "byok" : "credits");
 
   const moduleIds = useMemo(() => [...selected].sort(), [selected]);
   const { data: scope, isFetching: loadingScope } = useScope(moduleIds);
@@ -47,6 +61,15 @@ export function SessionSetupScreen() {
 
   const durationSeconds = durationChoice === 0 ? OPEN_ENDED_SECONDS : durationChoice;
 
+  /* Offered only once a scope exists to have suggested it, and only when it is
+     not already one of the fixed options — two identical choices is a worse
+     picker than three. */
+  const suggestedSeconds = scope?.suggested_seconds ?? 0;
+  const suggested =
+    suggestedSeconds > 0 && !DURATIONS.some((d) => d.value === suggestedSeconds)
+      ? suggestedSeconds
+      : 0;
+
   const blocked =
     moduleIds.length === 0
       ? "Choose at least one Module before starting."
@@ -56,7 +79,7 @@ export function SessionSetupScreen() {
 
   return (
     <>
-      <PageHeader title="New Session" sub="Scope and duration, fixed before the first question">
+      <PageHeader title="New Session" sub="Scope, duration and who pays — fixed before the first question">
         {running ? (
           <ButtonLink to={`/examination/${running.id}`} variant="ghost" size="sm">
             <Icon name="resume" size={14} />
@@ -76,14 +99,21 @@ export function SessionSetupScreen() {
             provider={prefs.provider}
             starting={start.isPending}
             blocked={blocked}
-            onBegin={() => start.mutate({ moduleIds, durationSeconds, provider: prefs.provider })}
+            onBegin={() =>
+              start.mutate({
+                moduleIds,
+                durationSeconds,
+                provider: prefs.provider,
+                paymentRoute: routeChoice ?? undefined,
+              })
+            }
           />
         }
       >
         <p className="eyebrow">Before a single question</p>
-        <h1 className="display-3 mt-4">Scope and duration.</h1>
+        <h1 className="display-3 mt-4">Scope, duration, and who pays.</h1>
         <p className="prose mt-6">
-          Two decisions, made once. After this the Session proceeds as Topic Visits and does not ask you
+          Three decisions, made once. After this the Session runs the plan it made and does not ask you
           anything else about itself.
         </p>
 
@@ -122,6 +152,24 @@ export function SessionSetupScreen() {
             <span className="caption">Soft deadline</span>
           </div>
           <div className="grid-3" role="radiogroup" aria-labelledby="step-duration">
+            {/* The scope's own suggestion, offered as a choice rather than
+                imposed as a default. It is the server's figure — the surface
+                derives no time of its own, because doing that would be a
+                second implementation of the pacing rule (ADR-0009). */}
+            {suggested ? (
+              <Choice
+                name="duration"
+                value={String(suggested)}
+                checked={durationChoice === suggested}
+                onChange={(v) => {
+                  const next = Number(v);
+                  setDurationChoice(next);
+                  savePrefs({ ...prefs, defaultDuration: next });
+                }}
+                title={fmtDuration(suggested)}
+                sub="Suggested · one question per Topic"
+              />
+            ) : null}
             {DURATIONS.map((d) => (
               <Choice
                 key={d.value}
@@ -147,15 +195,20 @@ export function SessionSetupScreen() {
           </Panel>
         </section>
 
-        <section className="mt-11" aria-labelledby="step-rules">
+        <section className="mt-11" aria-labelledby="step-pays">
           <div className="section-head">
             <div>
               <span className="step-n">Step 03</span>
-              <h2 className="h2 mt-3" id="step-rules">Rules of evidence</h2>
+              <h2 className="h2 mt-3" id="step-pays">Who pays</h2>
             </div>
-            <span className="caption">In force, not adjustable</span>
+            <span className="caption">Fixed for the whole Session</span>
           </div>
-          <EvidenceRules />
+          <PaymentRoutePicker
+            route={route}
+            hasKey={hasKey}
+            fingerprint={credits?.byok?.fingerprint}
+            onChange={setRouteChoice}
+          />
 
           <div className="grid-2 mt-8">
             <SelectField
@@ -166,10 +219,21 @@ export function SessionSetupScreen() {
               hint="Recorded on every Evidence row alongside its cost. Kept for your next Session too."
             />
             <p className="caption" style={{ alignSelf: "end" }}>
-              Which ledger pays is settled from your key situation when the Session starts, not from this
-              screen — a Session that billed Credits against an attached key would charge twice over.
+              A Session that runs out of Credits is parked, not ended — topping up resumes it on the Topics it
+              had not reached.
             </p>
           </div>
+        </section>
+
+        <section className="mt-11" aria-labelledby="step-rules">
+          <div className="section-head">
+            <div>
+              <span className="step-n">Step 04</span>
+              <h2 className="h2 mt-3" id="step-rules">Rules of evidence</h2>
+            </div>
+            <span className="caption">In force, not adjustable</span>
+          </div>
+          <EvidenceRules />
         </section>
       </Workbench>
     </>

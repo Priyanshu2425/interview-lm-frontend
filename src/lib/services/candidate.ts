@@ -1,11 +1,23 @@
 import { api } from "../api-client";
 import { endpoints } from "../endpoints";
 import type {
-  CandidateConfidence, CoverageStanding, CreditsRecord, ProviderPrices, TopicReading,
-  TopicStanding,
+  CandidateConfidence, CandidateProfile, CoverageStanding, CreditsRecord,
+  OnboardingInput, ProviderPrices, TopicReading, TopicStanding,
 } from "@/shared/types";
 
 export const candidateService = {
+  /* Who is signed in, and whether they have ever said so (ISSUE-0048). */
+  me: () => api.request<CandidateProfile>(endpoints.candidates.me()),
+
+  /* Writes the fields and stamps the first completion. Omitted fields are
+     left alone, and an unknown one is refused rather than dropped — so the
+     body is built from the four known keys and never spread from form state. */
+  onboard: (input: OnboardingInput) =>
+    api.request<CandidateProfile>(endpoints.candidates.me(), {
+      method: "PATCH",
+      body: input,
+    }),
+
   confidence: () => api.request<CandidateConfidence>(endpoints.candidates.confidence()),
 
   /* Untested Topics are absent here rather than ranked last — they are

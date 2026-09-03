@@ -65,6 +65,57 @@
   .workbench-main { padding: var(--s-8) var(--s-7) var(--s-11); }
 }
 
+/* -- the bench: three columns that scroll independently -------------------- */
+
+/* The frame is the viewport, not the document. Every column scrolls inside it,
+   so selecting something in one does not scroll the others away.
+
+   `min-height: 0` everywhere is load-bearing rather than defensive: a grid item
+   defaults to `auto`, grows past its row, and makes the *page* the scroller —
+   and `overflow: hidden` on a page that already overflows does not stop
+   `scrollIntoView` from moving it. */
+.bench {
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr) minmax(300px, 368px);
+  height: calc(100dvh - var(--h-topbar));
+  min-height: 0;
+  border-top: var(--bw-hair) solid var(--border);
+}
+
+.col { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.col + .col { border-left: var(--bw-hair) solid var(--border); }
+.col--docs { background: var(--surface); }
+
+.col-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s-5); min-height: 53px;
+  padding: var(--s-6) var(--s-7);
+  border-bottom: var(--bw-hair) solid var(--border);
+}
+.col-body { flex: 1; min-height: 0; overflow: auto; padding: var(--s-7); }
+.col--docs .col-body { padding: var(--s-5); }
+.col--doc .col-body { padding: var(--s-9) var(--s-10); }
+
+/* Two columns: what was extracted goes under the document it came from rather
+   than being squeezed beside it. */
+@media (max-width: 1100px) {
+  .bench { grid-template-columns: 220px minmax(0, 1fr); }
+  .col--out {
+    grid-column: 1 / -1;
+    border-left: 0; border-top: var(--bw-hair) solid var(--border);
+  }
+}
+
+/* One column, and the page scrolls again. A viewport-height frame with its own
+   scrollers on a phone is a trap: the outer thing cannot move and the inner
+   one is what the reader is trying to swipe. */
+@media (max-width: 900px) {
+  .bench { grid-template-columns: minmax(0, 1fr); height: auto; min-height: 0; }
+  .col + .col { border-left: 0; border-top: var(--bw-hair) solid var(--border); }
+  .col-body { overflow: visible; }
+  .col--doc .col-body { padding: var(--s-8) var(--s-7); }
+}
+
 /* -- mobile: the rail becomes a drawer ------------------------------------ */
 
 @media (max-width: 900px) {
@@ -116,6 +167,11 @@
 
 .topbar-title {
   display: grid; min-width: 0;
+}
+/* The title yields before the action does: a screen's one control must stay on
+   the row at every width, and a long notebook name is what would push it off. */
+.topbar-title > strong {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .topbar-title strong {
   font-family: var(--font-display); font-weight: var(--display-weight);

@@ -11,6 +11,7 @@ const source = (over: Partial<NotebookSource>): NotebookSource => ({
   progress_done: 0,
   progress_total: 0,
   selectable: true,
+  topic_count: 0,
   elapsed_seconds: null,
   since_progress_seconds: null,
   ...over,
@@ -22,6 +23,7 @@ const library = (...sources: NotebookSource[]): Notebook[] => [{
   title: "My Library",
   embedding_model: "hashing-v1",
   visibility: "personal",
+  created_at: "2026-09-01T00:00:00Z",
   sources,
 }];
 

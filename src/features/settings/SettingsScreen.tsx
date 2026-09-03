@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { PageHeader, Workbench } from "@/shared/components";
+import { useProfile } from "@/features/onboarding";
 import {
   Button, ButtonLink, Choice, Dialog, Icon, Panel, SectionHead, SelectField, Switch, Tag,
 } from "@/ui";
@@ -10,7 +11,7 @@ import type { Preferences } from "@/shared/stores/preferences";
 import { useSessionUser } from "@/shared/stores/session";
 import { signOut } from "@/lib/auth/gatehouse";
 import { useToast } from "@/shared/stores/toasts";
-import { useCredits } from "@/features/credits/hooks/useCredits";
+import { useCredits } from "@/features/credits";
 import { SettingsNav } from "./components/SettingsNav";
 import type { SettingsSection } from "./components/SettingsNav";
 
@@ -37,6 +38,7 @@ const DURATIONS = [
    - Appearance applies on the click. A variation you cannot see until you
      press Save is a preview you did not get. */
 export function SettingsScreen() {
+  const profile = useProfile();
   const saved = usePreferenceStore((s) => s.prefs);
   const save = usePreferenceStore((s) => s.save);
   const resetPrefs = usePreferenceStore((s) => s.reset);
@@ -232,6 +234,21 @@ export function SettingsScreen() {
         <section className="mt-11" id="set-data">
           <SectionHead title="Identity and data" aside="What this browser holds" />
           <Panel pad={7} className="stack g-7">
+            {/* The one visible payoff for filling in the welcome form. The
+                other three answers are collected and read by nothing yet, and
+                showing them here would imply otherwise. */}
+            {profile.data?.display_name ? (
+              <div className="between">
+                <div style={{ minWidth: 0 }}>
+                  <span className="label">Name</span>
+                  <p className="caption" style={{ margin: "var(--s-3) 0 0" }}>
+                    What this browser calls you. Nobody is ranked by it.
+                  </p>
+                </div>
+                <strong className="mono">{profile.data.display_name}</strong>
+              </div>
+            ) : null}
+
             <div className="between">
               <div style={{ minWidth: 0 }}>
                 <span className="label">Signed in as</span>

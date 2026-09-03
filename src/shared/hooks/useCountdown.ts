@@ -34,7 +34,7 @@ const serverSnapshot = () => 0;
 /* Seconds remaining against a fixed end instant.
 
    It is allowed to go negative and the caller is expected to render that: the
-   deadline is soft, and a Session ends *after* the current Topic Visit
+   deadline is soft, and a Session ends *after* the question being asked
    finishes, never inside one. Clamping at zero would tell the Candidate the
    Session had already stopped. */
 export function useCountdown(endsAt: number | null): number | null {

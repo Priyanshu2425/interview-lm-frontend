@@ -1,18 +1,21 @@
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { sessionService } from "@/lib/services/sessions";
-import { useSessionUser } from "@/shared/stores/session";
 import { useSessionHistory } from "@/shared/stores/sessionHistory";
 import { useToast } from "@/shared/stores/toasts";
+import type { PaymentRoute } from "@/shared/types";
 
 export interface StartInput {
   moduleIds: string[];
   durationSeconds: number;
   provider: string;
+  /* Which key pays, chosen on the setup screen. Left out and the server falls
+     back to whatever the Key Vault implies. `mcp` is not offered — it is not
+     a Candidate's route to pick. */
+  paymentRoute?: PaymentRoute;
 }
 
 export function useStartSession() {
-  const candidateId = useSessionUser() ?? "anonymous";
   const navigate = useNavigate();
   const remember = useSessionHistory((s) => s.remember);
   const toast = useToast();
@@ -20,14 +23,13 @@ export function useStartSession() {
   return useMutation({
     mutationFn: (input: StartInput) =>
       sessionService.start({
-        candidate_id: candidateId,
         module_ids: input.moduleIds,
         duration_seconds: input.durationSeconds,
         provider: input.provider,
-        /* Omitted on purpose. Which key pays is decided from the Key Vault,
-           not from the client's word — a Session that billed Credits against
-           an attached key would charge twice over. */
-        payment_route: null,
+        /* Null means "whatever my key situation implies" and is what a
+           Candidate who never touched the picker sends. A named route is
+           obeyed: the server refuses only `byok` with no key to spend. */
+        payment_route: input.paymentRoute ?? null,
       }),
     onSuccess: (data, input) => {
       remember({

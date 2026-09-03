@@ -336,6 +336,8 @@ table { border-collapse: collapse; width: 100%; }
 .choice input { position: absolute; opacity: 0; width: 0; height: 0; }
 .choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
 .choice:has(input:focus-visible) { outline: var(--bw-thick) solid var(--focus); outline-offset: 2px; }
+.choice[data-disabled] { cursor: not-allowed; opacity: .55; }
+.choice[data-disabled]:hover { background: var(--surface); }
 .choice-title { font-size: var(--t-14); font-weight: var(--w-semi); color: var(--fg); }
 .choice-sub { font-size: var(--t-12); color: var(--muted); }
 
@@ -549,25 +551,31 @@ table { border-collapse: collapse; width: 100%; }
 .empty .body-sm { color: var(--fg-2); }
 
 .toast {
+  /* A control, so it resets like one and keeps its own focus ring. */
+  appearance: none; cursor: pointer; text-align: left; font: inherit; color: inherit;
   display: flex; align-items: flex-start; gap: var(--s-5);
   padding: var(--s-5) var(--s-6); min-width: 268px; max-width: 380px;
   background: var(--surface); border: var(--bw-hair) solid var(--border-2);
   border-radius: var(--r-md); box-shadow: var(--shadow-2);
   animation: toast-in var(--d-3) var(--e-out);
 }
+.toast:hover { border-color: var(--border-2); background: var(--surface-2); }
 .toast-bar { width: 3px; border-radius: var(--r-full); background: var(--accent); align-self: stretch; flex: none; }
 .toast-bar-ok { background: var(--ok); }
 .toast-bar-risk { background: var(--risk); }
-@keyframes toast-in { from { opacity: 0; translate: 0 8px; } }
+@keyframes toast-in { from { opacity: 0; translate: 0 -8px; } }
 @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
 
 .toast-host {
-  position: fixed; right: var(--s-8); bottom: var(--s-8); z-index: var(--z-toast);
+  /* Top right, clear of the topbar. Notifications arrive where the eye is not
+     already working — the composer and the primary actions sit low. */
+  position: fixed; right: var(--s-8); top: calc(var(--h-topbar) + var(--s-5));
+  z-index: var(--z-toast);
   display: grid; gap: var(--s-4); pointer-events: none;
 }
 .toast-host > * { pointer-events: auto; }
 @media (max-width: 720px) {
-  .toast-host { right: var(--s-5); left: var(--s-5); bottom: var(--s-5); }
+  .toast-host { right: var(--s-5); left: var(--s-5); top: calc(var(--h-topbar) + var(--s-4)); }
   .toast { max-width: none; }
 }
 

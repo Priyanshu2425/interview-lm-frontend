@@ -1,6 +1,6 @@
 import { api } from "../api-client";
 import { endpoints } from "../endpoints";
-import type { Notebook, SourceUploaded } from "@/shared/types";
+import type { Notebook, NotebookSourceDetail, SourceUploaded } from "@/shared/types";
 
 export const notebookService = {
   list: () => api.request<Notebook[]>(endpoints.notebooks.list()),
@@ -10,10 +10,18 @@ export const notebookService = {
      updating, so it costs nothing and cannot itself stall. */
   read: (notebookId: string) => api.request<Notebook>(endpoints.notebooks.one(notebookId)),
 
-  create: (candidateId: string, title: string) =>
+  /* No candidate_id: a Corpus belongs to whoever uploaded it, and who that is
+     comes from the token that carried the request (ISSUE-0032). */
+  /* One document: its extracted text, the Topics cut from it, and where each
+     was cut from — in one response, because the offsets only mean anything
+     against that exact text. */
+  readSource: (notebookId: string, sourceId: string) =>
+    api.request<NotebookSourceDetail>(endpoints.notebooks.source(notebookId, sourceId)),
+
+  create: (title: string) =>
     api.request<Notebook>(endpoints.notebooks.create(), {
       method: "POST",
-      body: { candidate_id: candidateId, title },
+      body: { title },
     }),
 
   addText: (

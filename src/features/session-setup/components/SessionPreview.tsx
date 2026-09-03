@@ -28,6 +28,37 @@ export function SessionPreview({
     ["Duration", fmtDuration(durationSeconds)],
   ];
 
+  /* Read off Topic count and nothing else (ISSUE-0040). Not from how much
+     text a Topic holds: "more words so it needs longer" is a difficulty
+     reading wearing a clock's clothes, and difficulty is not a property this
+     product records. A time is neither a difficulty nor a cost. */
+  const pacing: [string, React.ReactNode, string][] = scope && scope.topic_count > 0
+    ? [
+        [
+          "Questions at full coverage",
+          scope.questions_at_full_coverage,
+          "One question per Topic in scope.",
+        ],
+        [
+          "Suggested",
+          fmtDuration(scope.suggested_seconds),
+          "Long enough to ask every Topic its own question.",
+        ],
+        [
+          "Minimum",
+          fmtDuration(scope.minimum_seconds),
+          "Below this, some Topic goes unexamined however the Session is planned.",
+        ],
+      ]
+    : [];
+
+  /* A statement, not a validation error. A short clock is a legitimate choice
+     that buys a compressed plan; whether it *is* compressed is the server's
+     word, and it arrives with the plan rather than being guessed at here. */
+  const tight = Boolean(
+    scope && scope.topic_count > 0 && durationSeconds < scope.minimum_seconds,
+  );
+
   return (
     <>
       <span className="eyebrow">Session preview</span>
@@ -40,6 +71,30 @@ export function SessionPreview({
           </div>
         ))}
       </div>
+
+      {pacing.length > 0 ? (
+        <div className="hair-t" style={{ paddingTop: "var(--s-6)" }}>
+          <span className="eyebrow">What this scope needs</span>
+          <div className="stack g-5 mt-4">
+            {pacing.map(([label, value]) => (
+              <div className="between" key={label}>
+                <span className="body-sm dim">{label}</span>
+                <strong className="mono">{value}</strong>
+              </div>
+            ))}
+          </div>
+          <p className="caption mt-4">{pacing[pacing.length - 1][2]}</p>
+          {tight ? (
+            <Panel tone="2" pad={6} className="stack g-4 mt-5">
+              <p className="body-sm dim" style={{ margin: 0 }}>
+                This clock cannot reach every Topic in this scope. The plan will group
+                Topics into shared questions, and some may go unasked — which is recorded
+                as unasked, never as a zero.
+              </p>
+            </Panel>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="hair-t" style={{ paddingTop: "var(--s-6)" }}>
         <div className="stack g-5">
@@ -68,7 +123,7 @@ export function SessionPreview({
         <CostUnknown>Not quoted before it is knowable.</CostUnknown>
         <p className="caption" style={{ margin: 0 }}>
           Topic material varies more than four-fold and you choose the duration, so a Session total is not
-          knowable before it runs. You see the real number after every Topic.
+          knowable before it runs. You see the real number in the report.
         </p>
       </Panel>
 
@@ -79,7 +134,7 @@ export function SessionPreview({
         onClick={onBegin}
         disabled={Boolean(blocked)}
         loading={starting}
-        loadingLabel="Opening the first Topic…"
+        loadingLabel="Planning the Session…"
         title={blocked ?? undefined}
       >
         Begin Session

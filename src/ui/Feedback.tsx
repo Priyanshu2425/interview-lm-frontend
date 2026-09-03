@@ -100,13 +100,21 @@ export function ToastHost() {
   return createPortal(
     <div className="toast-host" role="region" aria-live="polite" aria-label="Notifications">
       {toasts.map((t) => (
-        <div key={t.id} className="toast" onClick={() => dismiss(t.id)}>
+        /* A button, not a clickable div: it takes itself away after a while,
+           and until then dismissing it must not require a mouse. */
+        <button
+          key={t.id}
+          type="button"
+          className="toast"
+          onClick={() => dismiss(t.id)}
+          aria-label={`Dismiss: ${t.title}`}
+        >
           <span className={cn("toast-bar", t.tone === "ok" && "toast-bar-ok", t.tone === "risk" && "toast-bar-risk")} />
           <span>
             <strong className="body-sm">{t.title}</strong>
             {t.body ? <><br /><span className="caption">{t.body}</span></> : null}
           </span>
-        </div>
+        </button>
       ))}
     </div>,
     document.body,

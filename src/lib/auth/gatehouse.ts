@@ -75,6 +75,30 @@ function forget(): void {
   announce();
 }
 
+/* What to say when the identity provider refuses and does not say why.
+ *
+ * `detail` is preferred whenever there is one — the service that refused knows
+ * best, and composing over it is how a surface starts inventing reasons. But a
+ * refusal with no body left the raw status on screen, and "409" tells somebody
+ * staring at a sign-up form nothing at all about what to do next. Each of these
+ * says what happened and what would fix it. */
+const REFUSAL: Record<number, string> = {
+  400: "Something in that form was not accepted. Check it and try again.",
+  401: "That email and password do not match an account.",
+  403: "That account is not allowed to sign in here.",
+  404: "No account exists for that email.",
+  409: "An account already exists for that email. Sign in instead.",
+  410: "That link has expired. Ask for a new one.",
+  422: "Something in that form was not accepted. Check it and try again.",
+  429: "Too many attempts. Wait a moment and try again.",
+};
+
+const refusalFor = (status: number): string =>
+  REFUSAL[status]
+  ?? (status >= 500
+    ? "Sign-in is not answering right now. Try again in a moment."
+    : "That did not work. Try again.");
+
 async function call<T>(path: string, body?: unknown): Promise<T> {
   const response = await fetch(`${AUTH}${path}`, {
     method: "POST",
@@ -89,7 +113,9 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
   if (!response.ok) {
     throw new AuthError(
       response.status,
-      typeof data.detail === "string" ? data.detail : `${response.status} ${response.statusText}`,
+      typeof data.detail === "string" && data.detail.trim()
+        ? data.detail
+        : refusalFor(response.status),
       typeof data.field === "string" ? data.field : null,
     );
   }

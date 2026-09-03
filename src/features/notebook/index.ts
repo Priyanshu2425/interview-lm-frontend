@@ -1,1 +1,2 @@
-export { NotebookScreen } from "./NotebookScreen";
+export { NotebookLibraryScreen } from "./NotebookLibraryScreen";
+export { NotebookWorkbenchScreen } from "./NotebookWorkbenchScreen";

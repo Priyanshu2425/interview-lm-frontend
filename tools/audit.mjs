@@ -8,10 +8,15 @@ import { requireApi, requireSurface } from "./preflight.mjs";
 
 const BASE = process.env.BASE || "http://127.0.0.1:8000";
 const SID = process.env.SESSION_ID || "";
+/* A notebook to open, for auditing the three-column bench. Without one the
+   Library is still swept; the bench simply is not, and a route audited empty
+   would report a layout nobody can see as fine. */
+const NBID = process.env.NOTEBOOK_ID || "";
 const THEMES = ["graphite", "paper", "clinical", "signal", "dusk"];
 const ROUTES = [
-  "/mastery", "/notebook", "/session/new", "/examination",
-  `/evidence/${SID}`, "/credits", "/settings", "/operator",
+  "/mastery", "/notebook", "/session", "/session/new",
+  `/report/${SID}`, "/credits", "/settings", "/operator",
+  ...(NBID ? [`/notebook/${NBID}`] : []),
 ];
 
 const AUDIT = `(() => {

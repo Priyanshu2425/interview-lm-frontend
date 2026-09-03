@@ -3,7 +3,7 @@ import { clock, duration as fmtDuration } from "@/shared/utils/format";
 import { useCountdown } from "@/shared/hooks";
 
 /* The deadline is soft: past due is a state to report, not a stop. A Session
-   ends after the current Topic Visit finishes, never inside one. */
+   ends after the question being asked finishes, never inside one. */
 export function SessionTimer({ startedAt, durationSeconds }: {
   startedAt: number | null;
   durationSeconds: number;
@@ -25,26 +25,6 @@ export function SessionTimer({ startedAt, durationSeconds }: {
     <span className={overdue ? "timer timer--soft" : "timer"} aria-live="off">
       <Icon name="timer" size={13} />
       {overdue ? "Past due — finishing this Visit" : `${clock(remaining)} left`}
-    </span>
-  );
-}
-
-export function VisitDots({ scored, total }: { scored: number; total: number }) {
-  const dots = Math.max(total, scored + 1);
-  return (
-    <span
-      className="visits"
-      title={`${scored} Visit${scored === 1 ? "" : "s"} scored, on Visit ${scored + 1}`}
-      role="img"
-      aria-label={`${scored} of ${dots} Topic Visits scored`}
-    >
-      {Array.from({ length: dots }, (_, i) => (
-        <i
-          key={i}
-          data-done={i < scored ? "" : undefined}
-          data-current={i === scored ? "" : undefined}
-        />
-      ))}
     </span>
   );
 }

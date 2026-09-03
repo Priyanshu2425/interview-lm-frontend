@@ -39,11 +39,11 @@ async function page(width, height) {
 /* 1 — an Evidence row opened onto its grounding */
 {
   const { ctx, p } = await page(1440, 900);
-  await p.goto(`${BASE}/evidence/${SID}`, { waitUntil: "networkidle" });
+  await p.goto(`${BASE}/report/${SID}`, { waitUntil: "networkidle" });
   await p.waitForTimeout(400);
   await p.locator(".row-toggle").first().click();
   await p.waitForTimeout(300);
-  await p.screenshot({ path: `${out}/evidence-open.${theme}.png` });
+  await p.screenshot({ path: `${out}/report-open.${theme}.png` });
   await ctx.close();
 }
 
@@ -60,9 +60,8 @@ async function page(width, height) {
     if (!r.ok) throw new Error(`${path} → ${r.status} ${t.slice(0, 200)}`);
     return t ? JSON.parse(t) : null;
   };
-  const mods = await api("/corpus/modules?track=aiml&candidate_id=cand_shoot_demo");
+  const mods = await api("/skills/modules?track=aiml");
   const fresh = await api("/sessions", { method: "POST", body: {
-    candidate_id: "cand_shoot_demo",
     module_ids: mods.filter((m) => m.selectable !== false).slice(0, 3).map((m) => m.module_id),
     duration_seconds: 3000, provider: "deepseek" } });
 

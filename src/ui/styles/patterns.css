@@ -65,24 +65,6 @@
 }
 
 /* One Visit, one score. The single place a reveal is allowed to take a beat. */
-.dial {
-  --v: 0;
-  width: 76px; height: 76px; border-radius: var(--r-full); flex: none;
-  display: grid; place-items: center; position: relative;
-  background:
-    conic-gradient(var(--band, var(--accent)) calc(var(--v) * 360deg), var(--surface-3) 0);
-  transition: --v var(--d-5) var(--e-out);
-}
-@property --v { syntax: "<number>"; inherits: false; initial-value: 0; }
-.dial::after {
-  content: attr(data-label); position: absolute; inset: 5px;
-  border-radius: var(--r-full); background: var(--surface);
-  display: grid; place-items: center;
-  font-family: var(--font-mono); font-weight: var(--w-bold); font-size: var(--t-16);
-  color: var(--band, var(--fg)); font-variant-numeric: tabular-nums;
-}
-
-/* One cell per Topic, in curriculum order. Untested cells are holes. */
 .heat { display: flex; flex-wrap: wrap; gap: 3px; }
 .heat > i {
   width: 15px; height: 15px; border-radius: 2px;
@@ -175,7 +157,6 @@ button.topic { cursor: pointer; }
   transition: background var(--d-1) var(--e-out);
 }
 .module-head:hover { background: var(--surface-2); }
-.module-idx { font-family: var(--font-mono); font-size: var(--t-11); color: var(--muted); }
 .module-name { font-size: var(--t-13); font-weight: var(--w-medium); color: var(--fg); }
 .caret {
   width: 13px; height: 13px; color: var(--muted);
@@ -257,6 +238,205 @@ button.topic { cursor: pointer; }
 .visits > i[data-done] { background: var(--accent); }
 .visits > i[data-current] { background: var(--accent); outline: 2px solid var(--accent-soft); }
 
+/* The plan, as a list (ISSUE-0041).
+
+   No control lives in here, so nothing is focusable and nothing is a hit
+   target: the plan is fixed and the list is a reading of it. State is carried
+   by a hairline and a weight rather than by colour alone, and the word itself
+   is in the markup for anybody not reading the treatment. */
+.agenda { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.agenda-item {
+  display: grid; grid-template-columns: auto 1fr; gap: var(--s-5);
+  padding: var(--s-5) 0; align-items: baseline;
+  border-top: var(--bw-hair) solid var(--border);
+}
+.agenda-item:first-child { border-top: 0; }
+.agenda-n { font-size: var(--t-11); color: var(--muted); }
+.agenda-body { display: grid; gap: var(--s-3); min-width: 0; }
+.agenda-focus {
+  margin: 0; font-size: var(--t-14); line-height: var(--lh-body); color: var(--fg-2);
+}
+.agenda-topics {
+  display: flex; flex-wrap: wrap; gap: var(--s-3) var(--s-4);
+  font-family: var(--font-mono); font-size: var(--t-11); color: var(--muted);
+}
+.agenda-topic + .agenda-topic::before { content: "· "; }
+
+/* Asked is the only state that has happened. Planned has not happened yet and
+   unreached never will — neither is a failure and neither carries a number. */
+.agenda-item[data-state="asked"] .agenda-focus { color: var(--fg); }
+.agenda-item[data-state="asked"] .agenda-n { color: var(--accent); }
+.agenda-item[data-state="planned"] { opacity: 0.72; }
+.agenda-item[data-state="unreached"] .agenda-focus { color: var(--muted); }
+.agenda-item[data-state="unreached"] .agenda-n { text-decoration: line-through; }
+
+/* The one being asked. The accent's second and last appearance on this
+   screen — the composer's button is the first. */
+.agenda-item[data-current] { opacity: 1; }
+.agenda-item[data-current] .agenda-focus { color: var(--fg); font-weight: 500; }
+.agenda-item[data-current] .agenda-n {
+  color: var(--accent);
+  outline: 2px solid var(--accent-soft); outline-offset: 3px;
+  border-radius: var(--r-full);
+}
+
+.agenda--report .agenda-item { padding: var(--s-6) 0; }
+.agenda--report .agenda-focus { font-size: var(--t-16); }
+
+/* -- the Session list ------------------------------------------------------ */
+
+/* The one Session you can act on, lifted out of the record. It is the only
+   thing on the screen with an accent, because it is the only thing you can
+   do something about. */
+.open-card {
+  display: grid; gap: var(--s-6);
+  padding: var(--s-8);
+  border: var(--bw-hair) solid var(--accent-line); border-radius: var(--r-md);
+  background: color-mix(in oklch, var(--accent) 6%, var(--surface));
+}
+/* The scope and the one action sit on a row that cannot always hold both: a
+   long scope has no width to give back on a phone, so the action drops under
+   it rather than pushing the page sideways. */
+.open-card > .between { flex-wrap: wrap; }
+.open-card > .between > div { min-width: 0; }
+@media (max-width: 560px) {
+  .open-card { padding: var(--s-7); }
+  .open-card > .between > .btn { width: 100%; justify-content: center; }
+}
+
+/* How far into its plan a Session got. A position, never a score — which is
+   why it is dots rather than a number with a denominator that could be read
+   as a mark out of. */
+.dots { display: inline-flex; gap: 3px; }
+.dots > i {
+  width: 6px; height: 6px; border-radius: var(--r-full);
+  background: var(--surface-3);
+}
+.dots > i[data-done] { background: var(--accent); }
+
+/* -- the Notebook: a Library, and one document read back ------------------- */
+
+/* A notebook in the Library. The whole row is the link, so the target is the
+   row rather than the words in it. */
+.nb-row {
+  appearance: none; background: none; border: 0; cursor: pointer;
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--s-6); align-items: center; width: 100%; text-align: left;
+  padding: var(--s-7); color: inherit; text-decoration: none;
+  border-bottom: var(--bw-hair) solid var(--border);
+  transition: background var(--d-1);
+}
+.nb-row:last-child { border-bottom: 0; }
+.nb-row:hover { background: var(--surface-2); }
+.nb-glyph {
+  width: 38px; height: 38px; border-radius: var(--r-sm);
+  display: grid; place-items: center;
+  background: var(--surface-2); border: var(--bw-hair) solid var(--border-2);
+  font-family: var(--font-mono); font-size: var(--t-11); color: var(--muted);
+}
+.nb-title {
+  display: block; color: var(--fg); font-size: var(--t-16);
+  font-family: var(--font-display); font-weight: var(--w-medium);
+  line-height: var(--lh-snug);
+}
+.nb-sub { display: block; margin-top: var(--s-2); font-size: var(--t-12); color: var(--muted); }
+
+/* A document in the left column of the bench. */
+/* A document in the left column of the bench. */
+.doc-item {
+  position: relative;
+  padding: var(--s-5); border-radius: var(--r-sm);
+  border-left: var(--bw-thick) solid transparent;
+  transition: background var(--d-1), border-color var(--d-1);
+}
+.doc-item:hover { background: var(--surface-2); }
+.doc-item[data-current] { background: var(--surface-2); border-left-color: var(--accent); }
+.doc-open {
+  appearance: none; background: none; border: 0; padding: 0; cursor: pointer;
+  display: grid; gap: var(--s-4); min-width: 0; width: 100%; text-align: left;
+}
+/* The actions sit beside the document, and only appear on approach — a row of
+   permanent trash cans reads as a list of things to delete. */
+.doc-actions {
+  position: absolute; top: var(--s-4); right: var(--s-4);
+  display: flex; align-items: center; gap: var(--s-3);
+  background: var(--surface-2); border-radius: var(--r-sm);
+  opacity: 0; transition: opacity var(--d-1);
+}
+.doc-item:hover .doc-actions,
+.doc-item:focus-within .doc-actions { opacity: 1; }
+@media (hover: none) { .doc-actions { opacity: 1; } }
+.doc-top { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s-5); align-items: center; }
+/* The name is ellipsised because a filename is of arbitrary length and the
+   column is not — and a column that widens to fit one is a column that pushes
+   the document off the screen. */
+.doc-name { display: block; font-size: var(--t-13); color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-item[data-current] .doc-name { color: var(--fg); }
+.doc-meta { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; font-family: var(--font-mono); font-size: var(--t-11); color: var(--muted); }
+
+.ext {
+  font-family: var(--font-mono); font-size: var(--t-11); color: var(--faint);
+  border: var(--bw-hair) solid var(--border-2); border-radius: var(--r-xs);
+  padding: 1px 4px;
+}
+
+/* The document itself. It is prose, so it is set like prose: a reading
+   measure, loose leading, and page boundaries that read as boundaries. */
+.reading { max-width: 64ch; }
+.reading h4 { margin: var(--s-9) 0 var(--s-5); font-size: var(--t-18); color: var(--fg); }
+.reading .pg {
+  display: block; margin: var(--s-10) 0 var(--s-6); padding-top: var(--s-5);
+  border-top: var(--bw-hair) solid var(--border);
+  font-family: var(--font-mono); font-size: var(--t-11); color: var(--faint);
+  letter-spacing: var(--ls-caps); text-transform: uppercase;
+}
+.reading .pg:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+.reading .span {
+  display: block; margin: 0 0 var(--s-6) calc(-1 * var(--s-5));
+  padding: var(--s-4) var(--s-5); border-radius: var(--r-xs);
+  border-left: var(--bw-thick) solid transparent;
+  font-size: var(--t-14); line-height: var(--lh-loose); color: var(--fg-2);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  transition: background var(--d-2), border-color var(--d-2), opacity var(--d-2);
+}
+/* The material one Topic was cut from, and everything that is not it. Dimming
+   rather than hiding: the passage keeps its place on the page. */
+.reading .span[data-lit] { background: var(--accent-soft); border-left-color: var(--accent); }
+.reading .span[data-dim] { opacity: 0.38; }
+
+/* What was extracted. */
+.mod { padding: var(--s-6) 0; border-bottom: var(--bw-hair) solid var(--border); }
+.mod:first-child { padding-top: 0; }
+.mod:last-child { border-bottom: 0; }
+.mod-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-5); }
+.nowrap { white-space: nowrap; }
+.mod-title {
+  color: var(--fg); font-family: var(--font-display);
+  font-weight: var(--w-medium); font-size: var(--t-14);
+}
+.topics { list-style: none; margin: var(--s-5) 0 0; padding: 0; display: grid; gap: var(--s-1); }
+.topic {
+  appearance: none; background: none; border: 0; cursor: pointer;
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--s-5); align-items: baseline; width: 100%; text-align: left;
+  padding: var(--s-4) var(--s-5); border-radius: var(--r-sm);
+  border-left: var(--bw-thick) solid transparent;
+  transition: background var(--d-1), border-color var(--d-1);
+}
+.topic:hover { background: var(--surface-2); }
+.topic[aria-pressed="true"] { background: var(--surface-2); border-left-color: var(--accent); }
+.topic-n { font-family: var(--font-mono); font-size: var(--t-11); color: var(--faint); }
+.topic-t { font-size: var(--t-13); color: var(--fg-2); }
+.topic[aria-pressed="true"] .topic-t { color: var(--fg); }
+.topic-k { font-family: var(--font-mono); font-size: var(--t-11); color: var(--faint); }
+
+/* What is being shown, and the way out of it. */
+.bar {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-5);
+  padding: var(--s-5) var(--s-6); border-radius: var(--r-sm);
+  background: var(--surface-2); border: var(--bw-hair) solid var(--border-2);
+}
+
 .thinking { display: inline-flex; gap: 4px; align-items: center; height: 16px; }
 .thinking > span {
   width: 5px; height: 5px; border-radius: var(--r-full); background: var(--muted);
@@ -286,31 +466,12 @@ button.topic { cursor: pointer; }
    Achromatic by token. It is denied the accent that everything else uses to
    mean "ours", because visually it belongs to nobody. */
 
-.judge {
-  background: var(--judge-bg); color: var(--judge-fg);
-  border: var(--bw-hair) solid var(--judge-line); border-radius: var(--r-md);
-  overflow: hidden;
-}
-.judge-head {
-  display: flex; align-items: center; justify-content: space-between; gap: var(--s-5);
-  padding: var(--s-4) var(--s-6);
-  border-bottom: var(--bw-hair) solid var(--judge-line);
-  font-size: var(--t-11); letter-spacing: var(--ls-caps); text-transform: uppercase;
-  color: color-mix(in oklch, var(--judge-fg) 70%, transparent);
-  font-family: var(--font-mono);
-}
-.judge-body { display: grid; gap: var(--s-5); padding: var(--s-6); }
-.judge-blind {
-  display: flex; align-items: center; gap: var(--s-4);
-  font-size: var(--t-12); color: color-mix(in oklch, var(--judge-fg) 72%, transparent);
-}
 .judge-in { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s-3) var(--s-6); margin: 0; }
 .judge-in dt {
   font-family: var(--font-mono); font-size: var(--t-11); color: color-mix(in oklch, var(--judge-fg) 60%, transparent);
   letter-spacing: var(--ls-mono); white-space: nowrap;
 }
 .judge-in dd { margin: 0; font-size: var(--t-12); line-height: var(--lh-body); color: var(--judge-fg); }
-.judge .hair-t { border-top-color: var(--judge-line); }
 
 /* ---------------------------------------------------------- the Evidence -- */
 
@@ -362,47 +523,10 @@ button.topic { cursor: pointer; }
 .dropzone svg { color: var(--faint); }
 .dropzone .body-sm { color: var(--fg-2); }
 
-.doc {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center;
-  gap: var(--s-5); padding: var(--s-5) var(--s-6);
-  border: var(--bw-hair) solid var(--border); border-radius: var(--r-sm);
-  background: var(--surface);
-}
-.doc-icon {
-  display: grid; place-items: center; width: 34px; height: 34px; flex: none;
-  border-radius: var(--r-xs); background: var(--surface-2);
-  font-family: var(--font-mono); font-size: 10px; color: var(--muted);
-  border: var(--bw-hair) solid var(--border-2);
-}
-.doc-name { display: block; font-size: var(--t-13); color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.doc-meta { display: block; font-family: var(--font-mono); font-size: var(--t-11); color: var(--muted); }
 
-.pipe { display: grid; gap: var(--s-4); }
-.pipe-step {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center;
-  gap: var(--s-5); font-size: var(--t-12); color: var(--muted);
-}
-.pipe-mark {
-  display: grid; place-items: center; width: 17px; height: 17px; flex: none;
-  border-radius: var(--r-full); border: var(--bw-hair) solid var(--border-2);
-  color: var(--on-accent);
-}
-.pipe-step[data-state="done"] { color: var(--fg-2); }
-.pipe-step[data-state="done"] .pipe-mark { background: var(--ok); border-color: var(--ok); color: var(--bg); }
-.pipe-step[data-state="active"] { color: var(--fg); }
-.pipe-step[data-state="active"] .pipe-mark {
-  border-color: var(--accent);
-  box-shadow: inset 0 0 0 3px var(--accent);
-  animation: pulse 1.6s var(--e-in-out) infinite;
-}
 @keyframes pulse { 50% { box-shadow: inset 0 0 0 3px var(--accent), 0 0 0 4px var(--accent-soft); } }
 @media (prefers-reduced-motion: reduce) { .pipe-step[data-state="active"] .pipe-mark { animation: none; } }
 
-.cluster {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center;
-  gap: var(--s-5); padding: var(--s-4) var(--s-5); border-radius: var(--r-sm);
-}
-.cluster:hover { background: var(--surface-2); }
 
 .gt {
   display: grid; gap: var(--s-4); padding: var(--s-6);
@@ -415,14 +539,6 @@ button.topic { cursor: pointer; }
 .gt--none .eyebrow { color: var(--muted); }
 .gt--none .eyebrow::before { background: transparent; border: var(--bw-hair) dashed currentColor; }
 
-.door { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-6); }
-.door-card {
-  padding: var(--s-7); border: var(--bw-hair) solid var(--border);
-  border-radius: var(--r-md); background: var(--surface);
-  display: grid; gap: var(--s-5); align-content: start;
-}
-.door-card[data-active] { border-color: var(--accent); background: var(--accent-soft); }
-@media (max-width: 720px) { .door { grid-template-columns: 1fr; } }
 
 /* --------------------------------------------------------- the composer --- */
 
@@ -507,18 +623,6 @@ button.topic { cursor: pointer; }
 
 /* ------------------------------------------------------------ the result -- */
 
-.visit-result { display: grid; gap: var(--s-7); }
-.visit-result-head { align-items: flex-start; }
-.visit-result-why {
-  margin: 0; padding-left: var(--s-6);
-  border-left: var(--bw-hair) solid var(--border-2);
-  max-width: 62ch;
-}
-.visit-result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-8); }
-@media (max-width: 900px) { .visit-result-grid { grid-template-columns: 1fr; } }
-
-/* ------------------------------------------------------- rules of evidence */
-
 .rule-row {
   display: grid; grid-template-columns: 56px minmax(0, 1fr);
   gap: var(--s-6); align-items: start;
@@ -589,6 +693,7 @@ button.topic { cursor: pointer; }
 .table--evidence { min-width: 760px; }
 .table .col-toggle { width: 36px; padding-inline: var(--s-3); }
 .table--ledger { min-width: 680px; }
+.table--sessions { min-width: 860px; }
 
 .session-row {
   display: grid; grid-template-columns: minmax(0, 1fr) auto;

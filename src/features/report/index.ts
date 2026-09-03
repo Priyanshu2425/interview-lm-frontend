@@ -1,1 +1,1 @@
-export { EvidenceScreen } from "./EvidenceScreen";
+export { ReportScreen } from "./ReportScreen";

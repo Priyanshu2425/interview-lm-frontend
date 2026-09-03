@@ -20,10 +20,11 @@ interface NavItem {
    attention: needed, never frequent. */
 const PRIMARY: NavItem[] = [
   { to: "/notebook", label: "Notebook", icon: "notebook" },
-  { to: "/session/new", label: "Session", icon: "scope" },
-  { to: "/examination", label: "Examination", icon: "visit" },
+  /* One entry, not three. Examination could only be reached by already being
+     in a Session, and a report belongs to the Session it reports on — both
+     are opened from a row on this one. */
+  { to: "/session", label: "Session", icon: "visit" },
   { to: "/mastery", label: "Mastery", icon: "mastery" },
-  { to: "/evidence", label: "Evidence", icon: "ledger" },
 ];
 
 const SECONDARY: NavItem[] = [

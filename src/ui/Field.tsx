@@ -199,12 +199,23 @@ interface ChoiceProps {
   onChange: (value: string) => void;
   title: string;
   sub: string;
+  /* An option the server would refuse. It stays on the card rather than
+     disappearing, because a choice that vanishes reads as one that never
+     existed — and `sub` is where the reason goes. */
+  disabled?: boolean;
 }
 
-export function Choice({ name, value, checked, onChange, title, sub }: ChoiceProps) {
+export function Choice({ name, value, checked, onChange, title, sub, disabled }: ChoiceProps) {
   return (
-    <label className="choice">
-      <input type="radio" name={name} value={value} checked={checked} onChange={() => onChange(value)} />
+    <label className="choice" data-disabled={disabled ? "" : undefined}>
+      <input
+        type="radio"
+        name={name}
+        value={value}
+        checked={checked}
+        disabled={disabled}
+        onChange={() => onChange(value)}
+      />
       <span className="choice-title">{title}</span>
       <span className="choice-sub">{sub}</span>
     </label>

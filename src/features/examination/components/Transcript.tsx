@@ -1,8 +1,6 @@
 import { memo } from "react";
-import type { PaymentRoute, Spend } from "@/shared/types";
-import type { TranscriptEntry, Turn, TurnRole } from "../hooks/useExamination";
+import type { Turn, TurnRole } from "../hooks/useExamination";
 import { Thinking } from "@/ui";
-import { VisitResult } from "./VisitResult";
 
 const ROLE_LABEL: Record<TurnRole, string> = {
   examiner: "Examiner",
@@ -23,42 +21,28 @@ const TurnRow = memo(function TurnRow({ turn }: { turn: Turn }) {
 });
 
 interface TranscriptProps {
-  entries: TranscriptEntry[];
+  turns: Turn[];
   thinking: boolean;
-  resumedMidVisit: boolean;
-  route: PaymentRoute;
-  spend: Spend | undefined;
-  ended: boolean;
+  resumedMidQuestion: boolean;
 }
 
-/* One stream, in the order things happened: the exchange, then the score the
-   Visit produced, then the question that opens the next one. */
-export function Transcript({ entries, thinking, resumedMidVisit, route, spend, ended }: TranscriptProps) {
+/* One stream, in the order things happened.
+   Nothing is graded while a Session runs (ISSUE-0042), so there is no score to
+   place between two turns and no closed-Visit event to interleave. */
+export function Transcript({ turns, thinking, resumedMidQuestion }: TranscriptProps) {
   return (
     <div aria-live="polite" aria-relevant="additions">
-      {resumedMidVisit ? (
+      {/* Only when the transcript could not be read back. When it can, the
+          earlier turns are simply here and there is nothing to explain. */}
+      {resumedMidQuestion ? (
         <p className="caption hair-b" style={{ paddingBottom: "var(--s-5)" }}>
-          Picked up mid-Visit. The earlier turns are on the record — the surface is not served them back,
-          and the Judge sees the whole exchange whether or not it is on this screen.
+          Picked up mid-question. The earlier turns are on the record — this screen
+          could not read them back, and the Judge sees the whole exchange whether or
+          not it is shown here.
         </p>
       ) : null}
 
-      {entries.map((entry) =>
-        entry.type === "turn" ? (
-          <TurnRow key={entry.id} turn={entry} />
-        ) : (
-          <div className="mt-8" key={entry.id}>
-            <VisitResult
-              visit={entry.visit}
-              route={route}
-              credits={
-                spend?.per_visit.find((v) => v.topic_visit_id === entry.visit.topic_visit_id)?.credits ?? null
-              }
-              ended={ended}
-            />
-          </div>
-        ),
-      )}
+      {turns.map((turn) => <TurnRow key={turn.id} turn={turn} />)}
 
       {thinking ? (
         <div className="turn turn--examiner">

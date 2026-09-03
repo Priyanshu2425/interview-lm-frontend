@@ -57,7 +57,7 @@ await seed();
 await p.goto(BASE + "/session/new", { waitUntil: "networkidle" });
 await p.waitForTimeout(500);
 
-const apiModules = await api(`/corpus/modules?track=aiml&candidate_id=${CID}`);
+const apiModules = await api(`/skills/modules?track=aiml`);
 const shownCounts = await p.evaluate(() =>
   [...document.querySelectorAll(".scope-item .caption")]
     .map((n) => (n.textContent.match(/^(\d+) Topics/) || [])[1]).filter(Boolean).map(Number));
@@ -103,8 +103,10 @@ await p.waitForTimeout(1200);
 const sid = new URL(p.url()).pathname.split("/").pop();
 ok("a question renders", await p.evaluate(() => Boolean(document.querySelector(".turn--examiner .turn-body")?.textContent.trim())));
 ok("the Grading Mode is named in words", await p.evaluate(() => /Graded (against|from|on)/.test(document.body.innerText)));
-ok("the side panel offers Grounding, Confidence and Judge",
-   (await p.locator('[role="tab"]').count()) === 3);
+ok("the rail shows the plan the Session is running",
+   await p.evaluate(() => document.querySelectorAll(".agenda-item").length > 0));
+ok("the question being asked is marked on the plan",
+   await p.evaluate(() => document.querySelectorAll(".agenda-item[data-current]").length === 1));
 
 /* Hold the turn open so the in-flight window is observable rather than a race. */
 await p.route("**/turns", async (route) => {
@@ -123,27 +125,20 @@ await p.unroute("**/turns");
 ok("the composer is usable again once the turn lands",
    await p.evaluate(() => document.querySelector("#answer")?.disabled === false));
 
-/* ------------------------------------------------------------ the score -- */
-console.log("\nThe scored Topic");
-ok("a Visit score renders", await p.evaluate(() => /^\d\.\d\d$/.test(document.querySelector(".dial")?.dataset.label || "")));
-ok("the posterior is drawn from real alpha and beta",
-   await p.evaluate(() => (document.querySelector(".visit-result .beta-line")?.getAttribute("d") || "").length > 200));
-ok("provenance travels with the score",
-   await p.evaluate(() => /server_judge/.test(document.querySelector(".visit-result")?.textContent || "")));
-ok("the cost of the Visit is shown",
-   await p.evaluate(() => /\d+ Cr|—/.test(document.querySelector(".visit-result")?.textContent || "")));
-ok("Coverage and Mastery appear as two readings, not one figure",
-   await p.evaluate(() => {
-     const card = document.querySelector(".visit-result");
-     return Boolean(card?.querySelector(".coverage")) &&
-            Boolean(card?.querySelector(".mastery, .untested"));
-   }));
-ok("the score arrives before the next question, not after it",
-   await p.evaluate(() => {
-     const nodes = [...document.querySelectorAll(".workbench-stage .turn, .workbench-stage .visit-result")];
-     const visit = nodes.findIndex((n) => n.classList.contains("visit-result"));
-     return visit > 0 && nodes.length > visit + 1 && nodes[visit + 1].classList.contains("turn--examiner");
-   }));
+/* ------------------------------------------------------- interview mode -- */
+console.log("\nInterview Mode");
+/* The Session is graded once, at the end. Nothing on this screen may carry a
+   reading: no score, no band, no posterior — the strongest and cheapest net
+   for that is that no numeral of the shape 0.00 appears at all. */
+ok("no reading appears anywhere in the exchange",
+   !(await p.evaluate(() => /\d\.\d\d/.test(document.querySelector(".workbench-stage")?.innerText || ""))));
+ok("no per-question score is claimed in words",
+   !(await p.evaluate(() => /\b(scored|your score|graded this|score for this)\b/i.test(
+     document.querySelector(".workbench-stage")?.innerText || ""))));
+ok("the plan is fixed: nothing in the agenda is a control",
+   await p.evaluate(() => document.querySelectorAll(".agenda button, .agenda input").length === 0));
+ok("planning is metered on its own line, never folded into the questions",
+   await p.evaluate(() => /to plan it/i.test(document.querySelector(".workbench-side")?.innerText || "")));
 ok("no fused figure anywhere in the DOM",
    !(await p.evaluate(() => /overall score|combined score|percent complete|% complete/i.test(document.body.innerText))));
 ok("no Answer Key text is in the DOM",
@@ -166,15 +161,47 @@ ok("three identical turns produce at most one new Visit",
    after.visits.length - before.visits.length <= 1,
    `${before.visits.length} → ${after.visits.length}`);
 
-/* -------------------------------------------------------------- evidence -- */
-console.log("\nThe Session record");
-await p.goto(`${BASE}/evidence/${sid}`, { waitUntil: "networkidle" });
+/* ---------------------------------------------------------------- report -- */
+console.log("\nThe Session report");
+await p.goto(`${BASE}/report/${sid}`, { waitUntil: "networkidle" });
 await p.waitForTimeout(900);
-ok("one row per Topic Visit", (await p.locator(".table--evidence tbody tr").count()) >= 1);
+ok("the old address still answers",
+   await (async () => {
+     await p.goto(`${BASE}/evidence/${sid}`, { waitUntil: "networkidle" });
+     await p.waitForTimeout(500);
+     return p.url().includes("/report/");
+   })());
+ok("one row per Topic reached", (await p.locator(".table--evidence tbody tr").count()) >= 1);
 ok("every row names how it was graded",
    await p.evaluate(() => [...document.querySelectorAll(".table--evidence tbody tr .tag")].length >= 1));
-ok("what was never asked has a section of its own",
-   await p.evaluate(() => /never asked about|And what it could not/i.test(document.body.innerText)));
+/* There is no headline number for a Session, and `SessionReport` has no field
+   that could hold one. The screen must not compose one either. */
+ok("no figure is claimed for the Session as a whole",
+   !(await p.evaluate(() => /\b(final|overall|total) (score|mastery|grade|result)\b/i.test(document.body.innerText))));
+ok("what was planned and never reached is named, in its own place",
+   await p.evaluate(() => /Not reached/i.test(document.body.innerText)));
+ok("an unreached Topic carries no number at all",
+   await (async () => {
+     const tab = p.getByRole("tab", { name: /Not reached/i });
+     if (await tab.count() === 0) return false;
+     await tab.click();
+     await p.waitForTimeout(300);
+     return p.evaluate(() => {
+       const pane = document.querySelector("#pane-unreached");
+       const rows = [...(pane?.querySelectorAll(".untested-row") ?? [])];
+       return rows.every((n) => !/\d\.\d\d/.test(n.textContent || ""));
+     });
+   })());
+ok("the plan it ran is on the report",
+   await (async () => {
+     const tab = p.getByRole("tab", { name: /The plan/i });
+     if (await tab.count() === 0) return true;   // a Session may have no plan
+     await tab.click();
+     await p.waitForTimeout(300);
+     return p.evaluate(() => document.querySelectorAll(".agenda-item").length > 0);
+   })());
+await p.getByRole("tab", { name: /Reached/i }).click();
+await p.waitForTimeout(300);
 ok("Untested renders the word and no number",
    await p.evaluate(() =>
      [...document.querySelectorAll(".untested")].every((n) => !/\d\.\d\d/.test(n.textContent || ""))));
@@ -256,15 +283,67 @@ ok("focus is visibly ringed",
      return cs.outlineStyle !== "none" && parseFloat(cs.outlineWidth) > 0;
    }));
 
+/* ----------------------------------------------------------------- session -- */
+console.log("\nThe Session list");
+await p.goto(BASE + "/session", { waitUntil: "networkidle" });
+await p.waitForTimeout(700);
+ok("the tab lists Sessions and offers to start one",
+   await p.evaluate(() => /Start a Session/.test(document.body.innerText)));
+ok("the rail has one Session entry, not three",
+   await p.evaluate(() => {
+     const labels = [...document.querySelectorAll(".rail a")].map((a) => a.textContent.trim());
+     return labels.includes("Session")
+       && !labels.includes("Examination") && !labels.includes("Report");
+   }));
+/* A Session has no reading, so the list has nothing that looks like one. */
+ok("no Session carries a score or a percentage",
+   !(await p.evaluate(() => /\d\.\d\d|\d+%/.test(
+     document.querySelector(".workbench-main")?.innerText || ""))));
+
+/* The two screens this replaced. Both were reachable and both are now a row
+   on this one, so their addresses lead here rather than nowhere. */
+for (const retired of ["/examination", "/report", "/evidence"]) {
+  await p.goto(BASE + retired, { waitUntil: "networkidle" });
+  await p.waitForTimeout(400);
+  ok(`${retired} leads to the Session list`, p.url().endsWith("/session"));
+}
+
+/* ---------------------------------------------------------------- notebook -- */
+console.log("\nThe Notebook");
 await p.goto(BASE + "/notebook", { waitUntil: "networkidle" });
 await p.waitForTimeout(600);
-const opened = await p.evaluate(() => {
-  const b = [...document.querySelectorAll("button")].find((x) => /Create a notebook/.test(x.textContent));
-  return Boolean(b);
-});
-if (opened) {
-  await p.getByRole("button", { name: /Create a notebook/ }).click();
-  await p.waitForTimeout(900);
+
+/* Your own material, and nothing else. Adding a document happens inside a
+   notebook, so the Library only makes them. */
+ok("the Library offers no way to upload",
+   await p.evaluate(() => !document.querySelector("input[type=file], .dropzone")));
+ok("its one action is a new notebook",
+   await p.evaluate(() => /New notebook/.test(document.body.innerText)));
+
+let nbid = null;
+if (await p.getByRole("button", { name: /New notebook/ }).count()) {
+  await p.getByRole("button", { name: /New notebook/ }).first().click();
+  await p.waitForTimeout(300);
+  await p.fill("input", "E2E notes");
+  await p.getByRole("button", { name: /Create and open/ }).click();
+  await p.waitForTimeout(1200);
+  nbid = (p.url().match(/\/notebook\/(nb-[a-z0-9]+)/) || [])[1] ?? null;
+}
+ok("creating one opens it", Boolean(nbid));
+
+if (nbid) {
+  ok("the workbench is three columns",
+     (await p.locator(".bench .col").count()) === 3);
+  ok("adding documents is the topbar's primary action",
+     await p.evaluate(() => {
+       const b = document.querySelector(".topbar .btn-primary");
+       return Boolean(b) && /Add documents/.test(b.textContent);
+     }));
+  ok("the documents column is not a second place to upload",
+     await p.evaluate(() => !document.querySelector(".col--docs .dropzone")));
+  ok("nothing on this screen carries a reading",
+     !(await p.evaluate(() => /\d\.\d\d/.test(
+       document.querySelector(".bench")?.innerText || ""))));
 }
 await p.goto(`${BASE}/examination/${sid}`, { waitUntil: "networkidle" });
 await p.waitForTimeout(900);
@@ -352,10 +431,10 @@ if (/\/examination\//.test(p.url())) {
   }
 }
 
-await p.goto(`${BASE}/evidence/${sid}`, { waitUntil: "networkidle" });
+await p.goto(`${BASE}/report/${sid}`, { waitUntil: "networkidle" });
 await p.waitForTimeout(700);
 const reachedDrawer = await tabTo("Show the grounding");
-ok("the record's drawers open by keyboard", reachedDrawer);
+ok("the report's drawers open by keyboard", reachedDrawer);
 if (reachedDrawer) {
   await p.keyboard.press("Enter");
   await p.waitForTimeout(400);
@@ -376,8 +455,12 @@ const FORBIDDEN = [
   [/\byour progress\b/i, "says progress where Coverage is meant"],
   [/\bwill cost\b|\bestimated cost\b|\bcosts? about\b/i, "quotes a price in advance"],
   [/overall (score|mastery|rating)/i, "implies one fused figure"],
+  [/\bfinal score\b/i, "gives a Session one number"],
+  [/\bsession (score|grade|result)\b/i, "reads a Session as a single figure"],
 ];
-for (const route of ["/mastery", "/session/new", "/evidence/" + sid, "/credits", "/settings", "/notebook"]) {
+const SWEPT = ["/mastery", "/session", "/session/new", "/report/" + sid, "/credits", "/settings", "/notebook"];
+if (nbid) SWEPT.push("/notebook/" + nbid);
+for (const route of SWEPT) {
   await p.goto(BASE + route, { waitUntil: "networkidle" });
   await p.waitForTimeout(400);
   const text = await p.evaluate(() => document.body.innerText);

@@ -1,11 +1,13 @@
 import { lazy } from "react";
-import { Navigate, createBrowserRouter } from "react-router-dom";
+import { Navigate, createBrowserRouter, useParams } from "react-router-dom";
 import { RootLayout } from "./layouts/RootLayout";
 import { MasteryScreen } from "@/features/mastery";
 import { SessionSetupScreen } from "@/features/session-setup";
+import { SessionsScreen } from "@/features/sessions";
 import { ExaminationScreen } from "@/features/examination";
-import { EvidenceScreen } from "@/features/evidence";
-import { NotebookScreen } from "@/features/notebook";
+import { ReportScreen } from "@/features/report";
+import { RequireOnboarding, WelcomeScreen } from "@/features/onboarding";
+import { NotebookLibraryScreen, NotebookWorkbenchScreen } from "@/features/notebook";
 import { NotFoundScreen } from "./NotFoundScreen";
 import { RouteError } from "./RouteError";
 import {
@@ -25,6 +27,14 @@ const SettingsScreen = lazy(() =>
 const OperatorScreen = lazy(() =>
   import("@/features/operator").then((m) => ({ default: m.OperatorScreen })),
 );
+const SkillsAdminScreen = lazy(() =>
+  import("@/features/skills-admin").then((m) => ({ default: m.SkillsAdminScreen })),
+);
+
+function RedirectToReport() {
+  const { sessionId } = useParams();
+  return <Navigate to={`/report/${sessionId}`} replace />;
+}
 
 export const router = createBrowserRouter([
   /* Outside the session, and outside the shell: somebody who is not signed in
@@ -38,7 +48,15 @@ export const router = createBrowserRouter([
   { path: "/verify-email", element: <VerifyEmailScreen /> },
   {
     element: <RequireSession />,
+    /* Signed in, but not yet asked who they are. The form sits inside the
+       session gate because the question needs a token to ask, and outside
+       `RootLayout` because a nav rail around a first-run form invites
+       somebody to leave it half-answered. */
     children: [{
+      element: <RequireOnboarding />,
+      children: [
+    { path: "/welcome", element: <WelcomeScreen /> },
+    {
     path: "/",
     element: <RootLayout />,
     /* Every screen behind the session shares one. A route without an
@@ -47,18 +65,43 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/mastery" replace /> },
       { path: "mastery", element: <MasteryScreen /> },
-      { path: "notebook", element: <NotebookScreen /> },
+      { path: "notebook", element: <NotebookLibraryScreen /> },
+      /* Two siblings rather than a parent with an Outlet: the Library and one
+         open notebook share no chrome, and a layout route whose only job is to
+         pick one of two disjoint screens is indirection with nothing in it. */
+      { path: "notebook/:notebookId", element: <NotebookWorkbenchScreen /> },
+      /* The Sessions you have sat, and the way to sit another. This was
+         `/examination`, which could only be reached by already being in one —
+         a tab whose entire content was an empty state telling you to go
+         elsewhere. */
+      { path: "session", element: <SessionsScreen /> },
       { path: "session/new", element: <SessionSetupScreen /> },
-      { path: "session", element: <Navigate to="/session/new" replace /> },
-      { path: "examination", element: <ExaminationScreen /> },
       { path: "examination/:sessionId", element: <ExaminationScreen /> },
-      { path: "evidence", element: <EvidenceScreen /> },
-      { path: "evidence/:sessionId", element: <EvidenceScreen /> },
+      { path: "examination", element: <Navigate to="/session" replace /> },
+      { path: "report/:sessionId", element: <ReportScreen /> },
+      /* A report belongs to one Session and is opened from its row. The
+         standalone picker read the browser's own history, which held five
+         entries and only from the browser that ran them. */
+      { path: "report", element: <Navigate to="/session" replace /> },
+      /* The record screen was `/evidence` until the Session stopped being a
+         sequence of graded Visits. Links to it are in people's history and in
+         Sessions already ended, so the old address keeps answering. */
+      { path: "evidence", element: <Navigate to="/session" replace /> },
+      { path: "evidence/:sessionId", element: <RedirectToReport /> },
       { path: "credits", element: <CreditsScreen /> },
       { path: "settings", element: <SettingsScreen /> },
-      { path: "operator", element: <OperatorScreen /> },
       { path: "*", element: <NotFoundScreen /> },
     ],
+    },
+      ],
     }],
   },
+  /* Operator and Skills are a team-only console gated by the `OPERATOR_TOKEN`
+     shared secret, a credential unrelated to a Candidate's Gatehouse session.
+     Nested under `RequireSession` (or `RootLayout`, which assumes a running
+     Session for its rail) they would need a Candidate login just to reach
+     their own operator-token gate — friction with no security benefit, since
+     the operator token is the actual gate either way. */
+  { path: "/operator", element: <OperatorScreen />, errorElement: <RouteError /> },
+  { path: "/skills-admin", element: <SkillsAdminScreen />, errorElement: <RouteError /> },
 ]);

@@ -1,33 +1,31 @@
 import type { SessionEnded, SessionParked } from "@/shared/types";
 import { Button, ButtonLink, Icon, Panel } from "@/ui";
+import { endReason } from "@/shared/utils/reasons";
 
-const REASON_COPY: Record<string, { title: string; body: string }> = {
-  duration: {
-    title: "Time was up, and the Visit finished anyway",
-    body: "The deadline passed during the last Topic, so the Session ran it to the end and scored it. Nothing was discarded.",
-  },
-  candidate_ended: {
-    title: "You ended the Session",
-    body: "The Topic in progress was examined to the end first. Everything it produced is on the record.",
-  },
-  scope_exhausted: {
-    title: "Every Topic in scope has been visited",
-    body: "Widen the scope, or come back to the thin evidence when there is more of it.",
-  },
-};
-
-export function SessionEndedNotice({ ended, sessionId }: { ended: SessionEnded; sessionId: string }) {
-  const copy = REASON_COPY[ended.reason] ?? {
-    title: "The Session ended",
-    body: `Reason recorded as ${ended.reason}.`,
-  };
+export function SessionEndedNotice({ ended, sessionId, graded }: {
+  ended: SessionEnded;
+  sessionId: string;
+  /** How many Topics the ending graded. Null where the Session ended on its
+   *  own edge rather than through `/end` — the report is the authority on
+   *  what was measured either way, so no number is invented here. */
+  graded?: number | null;
+}) {
+  const copy = endReason(ended.reason);
   return (
     <Panel pad={7} className="stack g-6 outcome">
       <span className="eyebrow">Session closed</span>
       <h2 className="h2">{copy.title}</h2>
       <p className="prose" style={{ margin: 0 }}>{copy.body}</p>
+      {/* Grading happens once, here, and this is the only place that says so
+          before the report is opened. A count of Topics measured is not a
+          score and is not a reading — it is how many rows were written. */}
+      <p className="body-sm dim" style={{ margin: 0 }}>
+        {typeof graded === "number"
+          ? `Graded now, in one pass: ${graded} Topic${graded === 1 ? "" : "s"} measured from what was said. Anything the plan never reached was left unasked.`
+          : "The whole Session was graded in one pass, from what was actually said. Anything the plan never reached was left unasked."}
+      </p>
       <div className="row g-4" style={{ flexWrap: "wrap" }}>
-        <ButtonLink to={`/evidence/${sessionId}`} variant="primary">See what it recorded</ButtonLink>
+        <ButtonLink to={`/report/${sessionId}`} variant="primary">Read the report</ButtonLink>
         <ButtonLink to="/mastery" variant="secondary">Mastery map</ButtonLink>
         <ButtonLink to="/session/new" variant="ghost">Start another</ButtonLink>
       </div>
@@ -52,6 +50,13 @@ export function SessionParkedNotice({ parked, onResume, resuming }: {
       </span>
       <h2 className="h2">This Session is waiting, not lost</h2>
       <p className="prose" style={{ margin: 0 }}>{parked.message}</p>
+      {/* Waiting is not over, and only a Session that is over is graded.
+          Saying so here is what stops a parked Session reading as a result
+          with the numbers missing. */}
+      <p className="body-sm dim" style={{ margin: 0 }}>
+        It has not been graded. Nothing is measured until the Session finishes, so
+        resuming carries on rather than starting again.
+      </p>
       {parked.provider ? (
         <p className="caption" style={{ margin: 0 }}>Provider: {parked.provider}</p>
       ) : null}

@@ -7,28 +7,31 @@ import { useSessionHistory } from "@/shared/stores/sessionHistory";
 import { useToast } from "@/shared/stores/toasts";
 import { useSessionUser } from "@/shared/stores/session";
 import type {
-  Citation, QuestionPayload, SessionEnded, SessionParked, TurnResult, VisitClosed,
+  QuestionPayload, SessionEnded, SessionParked, TranscriptMessage, TurnResult,
 } from "@/shared/types";
 
 export type TurnRole = "examiner" | "you" | "probe" | "hint";
 
-/* The transcript is a stream of events, not a list of sentences. A closed
-   Visit is one of those events and belongs in the stream at the moment it
-   happened — the next Visit's opening question arrives in the same response,
-   and rendering the score after that question would put the record out of
-   order. */
-export type TranscriptEntry =
-  | { id: string; type: "turn"; role: TurnRole; text: string; citations?: Citation[] }
-  | { id: string; type: "visit"; visit: VisitClosed };
-
-export type Turn = Extract<TranscriptEntry, { type: "turn" }>;
+/* One stream of turns, and nothing else.
+   Since ISSUE-0042 nothing is graded while a Session runs, so there is no
+   closed-Visit event to interleave and no score to place in the order it
+   happened. The reading arrives once, in the report. */
+export interface Turn {
+  id: string;
+  role: TurnRole;
+  text: string;
+}
 
 const ROLE_OF: Record<string, TurnRole> = {
   question: "examiner",
   probe: "probe",
   hint: "hint",
-  close: "examiner",
 };
+
+/* The transcript labels a turn by who said it and what kind of thing it was.
+   Both come off the row: the loop knew, and wrote it down. */
+const ROLE_OF_MESSAGE = (m: TranscriptMessage): TurnRole =>
+  m.role === "candidate" ? "you" : ROLE_OF[m.kind] ?? "examiner";
 
 let turnSeq = 0;
 const nextTurnId = () => `turn-${++turnSeq}`;
@@ -37,26 +40,32 @@ export interface ExaminationState {
   loading: boolean;
   /* The failure that stopped the read, rendered from the API's own message. */
   loadError: string | null;
-  entries: TranscriptEntry[];
-  /* True after a reload: the exchange so far is on the record, but the surface
-     is not served it back. Saying so is more honest than an empty transcript
-     that implies the Visit just began. */
-  resumedMidVisit: boolean;
+  turns: Turn[];
+  /* True after a reload that could not be filled in from the transcript. The
+     exchange so far is on the record either way; saying so is more honest
+     than an empty screen implying the question just began. */
+  resumedMidQuestion: boolean;
   current: QuestionPayload | null;
-  lastVisit: VisitClosed | null;
   ended: SessionEnded | null;
+  /* How many Topics the ending graded. Null while the Session is running, and
+     on a Session that parked rather than ended — parking is not grading. */
+  gradedCount: number | null;
   parked: SessionParked | null;
   sending: boolean;
   submitError: string | null;
   durationSeconds: number;
   paymentRoute: "credits" | "byok";
-  visitsScored: number;
-  visitsSeen: number;
+  /* Which fixed plan item is being asked, so the agenda can mark it. */
+  planItemId: string | null;
+  /* Every Topic the current question spans. A compressed item spans up to
+     three, and naming one of them would be a lie about what is being asked. */
+  topicTitles: string[];
   submit: (answer: string) => void;
   retry: () => void;
   resume: () => void;
   resuming: boolean;
-  dismissVisit: () => void;
+  ending: boolean;
+  end: () => void;
 }
 
 export function useExamination(sessionId: string): ExaminationState {
@@ -65,13 +74,12 @@ export function useExamination(sessionId: string): ExaminationState {
   const toast = useToast();
   const markEnded = useSessionHistory((s) => s.markEnded);
 
-  const [entries, setEntries] = useState<TranscriptEntry[]>([]);
+  const [turns, setTurns] = useState<Turn[]>([]);
   const [current, setCurrent] = useState<QuestionPayload | null>(null);
-  const [lastVisit, setLastVisit] = useState<VisitClosed | null>(null);
   const [ended, setEnded] = useState<SessionEnded | null>(null);
+  const [gradedCount, setGradedCount] = useState<number | null>(null);
   const [parked, setParked] = useState<SessionParked | null>(null);
-  const [resumedMidVisit, setResumedMidVisit] = useState(false);
-  const [scoredHere, setScoredHere] = useState(0);
+  const [resumedMidQuestion, setResumedMidQuestion] = useState(false);
 
   /* One idempotency key per composed answer, reused on every retry. It only
      advances when a turn has actually landed, so a retry after a timeout
@@ -100,11 +108,12 @@ export function useExamination(sessionId: string): ExaminationState {
     const pending = record.data.pending;
     if (pending) {
       setCurrent(pending);
-      setEntries([{
-        id: nextTurnId(), type: "turn",
-        role: ROLE_OF[pending.kind] ?? "examiner", text: pending.question,
+      setTurns([{
+        id: nextTurnId(),
+        role: ROLE_OF[pending.kind] ?? "examiner",
+        text: pending.question,
       }]);
-      setResumedMidVisit(pending.turn > 1);
+      setResumedMidQuestion(pending.turn > 1);
     }
     if (record.data.state === "ended") {
       setEnded({ session_id: sessionId, reason: record.data.ended_reason ?? "ended" });
@@ -113,10 +122,37 @@ export function useExamination(sessionId: string): ExaminationState {
         session_id: sessionId,
         code: record.data.parked_reason ?? "parked",
         message:
-          "This Session stopped at a Topic boundary. Nothing was lost — resuming opens the next Visit.",
+          "This Session stopped between questions. Nothing was lost — resuming opens the next one.",
         provider: record.data.provider ?? "",
         recoverable: true,
       });
+    }
+  }
+
+  /* What was actually said, for a Session picked up mid-question.
+     ISSUE-0042 made the transcript a thing the surface may read, so a reload
+     restores the exchange rather than apologising for an empty screen. Asked
+     for only in the case that needs it, and a failure is not an error: the
+     caption below still tells the truth if this never answers. */
+  const transcript = useQuery({
+    queryKey: queryKeys.session.transcript(sessionId),
+    queryFn: () => sessionService.transcript(sessionId),
+    enabled: Boolean(sessionId) && resumedMidQuestion,
+    staleTime: Infinity,
+    retry: 1,
+  });
+
+  const [filledFrom, setFilledFrom] = useState<string | null>(null);
+  if (transcript.data && resumedMidQuestion && filledFrom !== sessionId) {
+    setFilledFrom(sessionId);
+    const said = transcript.data.messages;
+    if (said.length > 0) {
+      setTurns(said.map((m) => ({
+        id: `msg-${m.seq}`,
+        role: ROLE_OF_MESSAGE(m),
+        text: m.text,
+      })));
+      setResumedMidQuestion(false);
     }
   }
 
@@ -133,42 +169,17 @@ export function useExamination(sessionId: string): ExaminationState {
       return;
     }
     if (result.kind === "session_ended") {
-      const payload = result.payload;
-      if (payload.last_visit) {
-        const visit = payload.last_visit;
-        setLastVisit(visit);
-        setScoredHere((n) => n + 1);
-        setEntries((prev) => [...prev, { id: nextTurnId(), type: "visit", visit }]);
-      }
-      setEnded(payload);
+      setEnded(result.payload);
       setCurrent(null);
       markEnded(sessionId);
       return;
     }
-    if (result.kind === "visit_closed") {
-      const visit = result.payload;
-      setLastVisit(visit);
-      setScoredHere((n) => n + 1);
-      setEntries((prev) => [...prev, { id: nextTurnId(), type: "visit", visit }]);
-      setCurrent(null);
-      return;
-    }
     const payload = result.payload;
-    setEntries((prev) => {
-      const next = [...prev];
-      /* The score for the Visit that just closed, then the question that opens
-         the next one — in that order, because that is the order they happened
-         in. */
-      if (payload.last_visit) {
-        next.push({ id: nextTurnId(), type: "visit", visit: payload.last_visit });
-      }
-      next.push({
-        id: nextTurnId(), type: "turn",
-        role: ROLE_OF[payload.kind] ?? "examiner", text: payload.question,
-      });
-      return next;
-    });
-    if (payload.last_visit) { setLastVisit(payload.last_visit); setScoredHere((n) => n + 1); }
+    setTurns((prev) => [...prev, {
+      id: nextTurnId(),
+      role: ROLE_OF[payload.kind] ?? "examiner",
+      text: payload.question,
+    }]);
     setCurrent(payload);
   }, [markEnded, sessionId]);
 
@@ -178,11 +189,21 @@ export function useExamination(sessionId: string): ExaminationState {
       turnIndex.current += 1;
       pendingAnswer.current = null;
       apply(result);
-      /* Spend moved. Anything reading it should notice without polling. */
+      /* Spend moved, and an item's state may have flipped `planned` to
+         `asked` — the agenda is read off the server and must follow. */
       void queryClient.invalidateQueries({ queryKey: queryKeys.session.spend(sessionId) });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.candidate.confidence(candidateId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.session.plan(sessionId) });
+      /* Not the Candidate's confidence: nothing is graded until the Session
+         ends, so no posterior moved and the mastery map has not changed. */
     },
   });
+
+  /* Grading happens at the end, so this is the moment every reading appears.
+     Both are expired here and nowhere else in the loop. */
+  const onSessionOver = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.session.report(sessionId) });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.candidate.confidence(candidateId) });
+  }, [queryClient, sessionId, candidateId]);
 
   const resume = useMutation({
     mutationFn: () => sessionService.resume(sessionId),
@@ -197,11 +218,52 @@ export function useExamination(sessionId: string): ExaminationState {
     },
   });
 
+  /* Ending is also grading (ISSUE-0044), and it answers in three ways.
+     A question still being asked finishes first and nothing has happened yet;
+     a Session that is over is graded; a Session that parked is *not*, because
+     topping up resumes it and a Beta observation would be written for
+     material the Candidate is about to be asked more about. */
+  const end = useMutation({
+    mutationFn: () => sessionService.end(sessionId),
+    onSuccess: (result) => {
+      if ("note" in result) {
+        toast({ title: "Ending after this question", body: result.note });
+        return;
+      }
+      if (result.state === "parked") {
+        setParked({
+          session_id: sessionId,
+          code: result.reason,
+          message:
+            "This Session is waiting rather than finished, so it has not been graded.",
+          provider: record.data?.provider ?? "",
+          recoverable: true,
+        });
+        setCurrent(null);
+        return;
+      }
+      setGradedCount(result.graded);
+      setEnded({ session_id: sessionId, reason: result.reason });
+      setCurrent(null);
+      markEnded(sessionId);
+      onSessionOver();
+    },
+    onError: (error: Error) => {
+      toast({ title: "The Session was not ended", body: error.message, tone: "risk" });
+    },
+  });
+
+  /* The graph grades on its own edge to END, so a Session that ran out of
+     plan or clock is graded without anybody calling `/end`. */
+  useEffect(() => {
+    if (endedReason) onSessionOver();
+  }, [endedReason, onSessionOver]);
+
   const submit = useCallback((answer: string) => {
     const text = answer.trim();
     if (!text) return;
     pendingAnswer.current = text;
-    setEntries((prev) => [...prev, { id: nextTurnId(), type: "turn", role: "you", text }]);
+    setTurns((prev) => [...prev, { id: nextTurnId(), role: "you", text }]);
     turn.mutate(text);
   }, [turn]);
 
@@ -218,31 +280,32 @@ export function useExamination(sessionId: string): ExaminationState {
     return "The connection dropped before the answer landed. Sending it again resolves to the same Answer Turn.";
   }, [turn.error]);
 
-  const visitsSeen = record.data?.visits.length ?? 0;
-  const visitsScored = Math.max(
-    scoredHere,
-    record.data?.visits.filter((v) => v.state === "graded").length ?? 0,
-  );
+  const topicTitles = useMemo(() => {
+    if (!current) return [];
+    const spanned = current.topic_titles ?? [];
+    return spanned.length > 0 ? spanned : [current.topic_title].filter(Boolean);
+  }, [current]);
 
   return {
     loading: record.isPending,
     loadError: record.error ? (record.error as Error).message : null,
-    entries,
-    resumedMidVisit,
+    turns,
+    resumedMidQuestion,
     current,
-    lastVisit,
     ended,
+    gradedCount,
     parked,
     sending: turn.isPending,
     submitError,
     durationSeconds: record.data?.duration_seconds ?? 0,
     paymentRoute: record.data?.payment_route ?? "credits",
-    visitsScored,
-    visitsSeen,
+    planItemId: current?.plan_item_id || null,
+    topicTitles,
     submit,
     retry,
     resume: resume.mutate,
     resuming: resume.isPending,
-    dismissVisit: () => setLastVisit(null),
+    ending: end.isPending,
+    end: end.mutate,
   };
 }

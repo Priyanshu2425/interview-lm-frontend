@@ -86,3 +86,49 @@ describe("the Beta renderer", () => {
     expect(JSON.stringify(f)).not.toMatch(/Z$/);
   });
 });
+
+/* -- The Judge reads two dimensions (ISSUE-0043) -------------------------- */
+
+describe("the two sub-scores", () => {
+  /* `source_score` is how much of the supplied material an answer explained;
+     `truth_score` is how close to correct it was. The average of two
+     different questions answers neither, and the combination that fed the
+     posterior is an input to the maths rather than a reading. The refusal is
+     enforced the way the others are — by an absent function. */
+  it("has no helper that takes both", async () => {
+    const format = await import("../format");
+    const band = await import("../band");
+    const exported: unknown[] = Object.values({ ...format, ...band });
+    const binary = exported.filter(
+      (v): v is (a: unknown, b: unknown) => unknown =>
+        typeof v === "function" && v.length >= 2,
+    );
+    /* Any two-argument helper here must not be one that fuses two readings.
+       `credits(value, route)` and `bandClass(band)` are the shapes allowed:
+       a value and a context, never a value and a second value. */
+    for (const fn of binary) {
+      expect(fn(0.9, 0.7)).not.toBe(0.8);
+      expect(fn(0.9, 0.7)).not.toBe("0.80");
+    }
+  });
+
+  it("renders either one absent as an em dash, never as a zero", () => {
+    /* Under model judgment there is no Answer Key, so `source_score` is null
+       — and a 0.00 there would read as "explained none of the material". */
+    expect(score(null)).toBe("\u2014");
+    expect(score(undefined)).toBe("\u2014");
+    expect(score(0)).toBe("0.00");
+  });
+});
+
+/* -- Untested is not zero, on a Session that never reached a Topic -------- */
+
+describe("a Topic the Session never reached", () => {
+  it("is not reportable, and has no band to render", () => {
+    /* The report builds unreached Topics into a shape with no band field at
+       all, so there is nothing for `bandClass` to be asked about. This holds
+       the rule one level down: untested never becomes a readable band. */
+    expect(isReportable("untested")).toBe(false);
+    expect(bandClass("untested")).toBe("band-untested");
+  });
+});

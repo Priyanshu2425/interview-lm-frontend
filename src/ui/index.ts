@@ -13,10 +13,11 @@ export type { TabItem } from "./Tabs";
 export { Dialog } from "./Dialog";
 export { Panel, SectionHead, Stat } from "./Panel";
 export { CostValue, CostUnknown } from "./Cost";
+export { SourceSpan } from "./Source";
 export {
   Skeleton, SkeletonLines, EmptyState, ErrorState, Meter, Thinking, ToastHost,
 } from "./Feedback";
 export {
-  BetaCurve, Reading, Coverage, CoverageFloor, Dial, Heat, Legend, Strip,
+  BetaCurve, Reading, Coverage, CoverageFloor, Heat, Legend, Strip,
 } from "./Confidence";
 export type { HeatCell } from "./Confidence";

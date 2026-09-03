@@ -15,6 +15,13 @@ if (typeof globalThis.localStorage === "undefined") {
   } as unknown as Storage;
 }
 
+/* jsdom has no layout, so it has no `scrollIntoView` either. Anything that
+   brings a selection into view calls it, and a missing method is a crash
+   rather than a no-op. */
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {};
+}
+
 /* jsdom implements neither matchMedia nor IntersectionObserver, and the shell
    reads both on mount. */
 if (!window.matchMedia) {

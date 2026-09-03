@@ -37,7 +37,9 @@ export interface RequestOptions {
 
 interface ApiClient {
   request: <T>(path: string, options?: RequestOptions) => Promise<T>;
-  upload: <T>(path: string, form: FormData, signal?: AbortSignal) => Promise<T>;
+  upload: <T>(
+    path: string, form: FormData, signal?: AbortSignal, headers?: Record<string, string>,
+  ) => Promise<T>;
 }
 
 function messageOf(data: unknown, fallback: string): string {
@@ -142,11 +144,13 @@ export function createApiClient(baseUrl: string, options: ClientOptions = {}): A
 
     /* A PDF is a file. Sending it through the JSON helper would mean base64,
        which doubles a 20 MB upload for nothing. */
-    async upload<T>(path: string, form: FormData, signal?: AbortSignal): Promise<T> {
+    async upload<T>(
+      path: string, form: FormData, signal?: AbortSignal, headers?: Record<string, string>,
+    ): Promise<T> {
       const send = async (): Promise<Response> =>
         fetch(baseUrl + path, {
           method: "POST", body: form, signal, credentials,
-          headers: await authorize({}),
+          headers: await authorize(headers ?? {}),
         });
       let response = await send();
       if (response.status === 401 && (await refresh()) !== null) {

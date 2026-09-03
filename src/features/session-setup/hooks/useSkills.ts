@@ -1,20 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
-import { corpusService } from "@/lib/services/corpus";
+import { skillsService } from "@/lib/services/skills";
 import { queryKeys } from "@/lib/query-keys";
 import { useSessionUser } from "@/shared/stores/session";
 
 export function useModules(track?: string) {
   const candidateId = useSessionUser() ?? "anonymous";
   return useQuery({
-    queryKey: queryKeys.corpus.modules(track, candidateId),
-    queryFn: () => corpusService.modules(track),
+    queryKey: queryKeys.skills.modules(track, candidateId),
+    queryFn: () => skillsService.modules(track),
   });
 }
 
 export function useTracks() {
   return useQuery({
-    queryKey: queryKeys.corpus.tracks(),
-    queryFn: () => corpusService.tracks(),
+    queryKey: queryKeys.skills.tracks(),
+    queryFn: () => skillsService.tracks(),
     staleTime: 5 * 60_000,
   });
 }
@@ -24,8 +24,8 @@ export function useTracks() {
    than the one being examined. */
 export function useScope(moduleIds: readonly string[]) {
   return useQuery({
-    queryKey: queryKeys.corpus.scope(moduleIds),
-    queryFn: () => corpusService.scope(moduleIds),
+    queryKey: queryKeys.skills.scope(moduleIds),
+    queryFn: () => skillsService.scope(moduleIds),
     enabled: moduleIds.length > 0,
   });
 }
@@ -34,8 +34,8 @@ export function useScope(moduleIds: readonly string[]) {
    asked for at the one moment nothing has been measured about the Candidate. */
 export function useScopeRelated(moduleIds: readonly string[]) {
   return useQuery({
-    queryKey: queryKeys.corpus.scopeRelated(moduleIds),
-    queryFn: () => corpusService.scopeRelated(moduleIds),
+    queryKey: queryKeys.skills.scopeRelated(moduleIds),
+    queryFn: () => skillsService.scopeRelated(moduleIds),
     enabled: moduleIds.length > 0,
   });
 }

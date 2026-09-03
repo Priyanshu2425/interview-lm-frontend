@@ -133,33 +133,6 @@ export function CoverageFloor({ have, need }: { have: number; need: number }) {
   return <span className="coverage-floor">{have} / {need} to floor</span>;
 }
 
-/* ---------------------------------------------------------- one Visit ----- */
-
-export function Dial({ value, band, label }: { value: number; band: Band; label: string }) {
-  const reduced = useReducedMotion();
-  /* Starts empty and fills on the next frame — a Visit resolves once, and it
-     is allowed to take a beat. With motion reduced it is simply already full,
-     decided during render rather than by an effect. */
-  const [filled, setFilled] = useState(false);
-  const v = reduced || filled ? value : 0;
-
-  useEffect(() => {
-    if (reduced) return;
-    const id = requestAnimationFrame(() => setFilled(true));
-    return () => cancelAnimationFrame(id);
-  }, [reduced, value]);
-
-  return (
-    <div
-      className={cn("dial", bandClass(band))}
-      style={{ "--v": v } as React.CSSProperties}
-      data-label={value.toFixed(2)}
-      role="img"
-      aria-label={`${label}. Visit score ${value.toFixed(2)} out of 1.00.`}
-    />
-  );
-}
-
 /* ----------------------------------------------------------- the corpus --- */
 
 export interface HeatCell {

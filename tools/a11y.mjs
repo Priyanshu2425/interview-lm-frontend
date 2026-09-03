@@ -59,11 +59,10 @@ await api("/credits/grants", {
 await p.goto(BASE + "/mastery", { waitUntil: "domcontentloaded" });
 await p.evaluate((cid) => localStorage.setItem("ilm.candidate.v1", cid), CID);
 
-const modules = await api(`/corpus/modules?track=aiml&candidate_id=${CID}`);
+const modules = await api(`/skills/modules?track=aiml`);
 const started = await api("/sessions", {
   method: "POST",
   body: {
-    candidate_id: CID,
     module_ids: [modules[0].module_id],
     duration_seconds: 1800,
   },
@@ -114,7 +113,9 @@ for (let i = 0; i < 8; i++) {
     method: "POST",
     body: { answer: "Scaling keeps the softmax in a region that still has gradient." },
   });
-  if (r?.payload?.kind === "visit_closed" || r?.kind === "visit_closed") break;
+  /* A Session ends rather than closing a Visit: since ISSUE-0042 no turn
+     carries a score, and the loop stops when the plan or the clock runs out. */
+  if (r?.kind === "session_ended" || r?.kind === "session_parked") break;
 }
 await p.goto(BASE + "/mastery", { waitUntil: "networkidle" });
 await p.waitForTimeout(1200);
@@ -136,7 +137,7 @@ if (ridges.length === 0) {
 
 /* ------------------------------------------------------------- the summary -- */
 console.log("\nThe record, as it is announced");
-await p.goto(`${BASE}/evidence/${sid}`, { waitUntil: "networkidle" });
+await p.goto(`${BASE}/report/${sid}`, { waitUntil: "networkidle" });
 await p.waitForTimeout(1000);
 tree = await axTree(p, await ctx.newCDPSession(p));
 

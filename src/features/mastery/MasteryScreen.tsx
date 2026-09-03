@@ -5,7 +5,7 @@ import {
 } from "@/ui";
 import type { Band, TopicReading } from "@/shared/types";
 import { useConfidence, useCoverageStanding, useUntestedModules } from "./hooks/useMastery";
-import { CorpusMap } from "./components/CorpusMap";
+import { SkillsMap } from "./components/SkillsMap";
 import { TopicRow } from "./components/TopicRow";
 import { TopicDetail } from "./components/TopicDetail";
 
@@ -126,7 +126,7 @@ export function MasteryScreen() {
             ) : null}
 
             <Panel pad={7} className="mt-8">
-              <CorpusMap
+              <SkillsMap
                 topics={topics}
                 total={coverage?.topics_total ?? topics.length}
                 onSelect={setSelectedId}

@@ -179,7 +179,7 @@ export function CreditsScreen() {
                           <thead>
                             <tr>
                               <th>Entry</th>
-                              <th style={{ width: 220 }}>Topic Visit</th>
+                              <th style={{ width: 220 }}>Question</th>
                               <th style={{ width: 150 }}>When</th>
                               <th style={{ width: 110 }} className="n">Credits</th>
                             </tr>
@@ -209,7 +209,7 @@ export function CreditsScreen() {
                     <EmptyState
                       icon="cost"
                       title="Nothing has been metered yet"
-                      body="A charge appears when a Topic Visit is graded, or when a notebook Source is embedded."
+                      body="A charge appears when a question is asked, or when a notebook Source is embedded."
                       action={<ButtonLink to="/session/new" variant="primary">Start a Session</ButtonLink>}
                     />
                   )}
@@ -226,7 +226,7 @@ export function CreditsScreen() {
                   icon="key"
                   title="There is no Credit ledger on this account"
                   body="Your key pays your Provider directly, so there is nothing to meter here. Cost and provenance still appear on every Evidence row — that is a property of the record, not of who paid."
-                  action={<ButtonLink to="/evidence" variant="primary">See the Evidence</ButtonLink>}
+                  action={<ButtonLink to="/report" variant="primary">See the reports</ButtonLink>}
                 />
               </div>
             )}

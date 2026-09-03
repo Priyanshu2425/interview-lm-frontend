@@ -27,7 +27,7 @@ function RailSpend() {
       <span className="eyebrow">This Session</span>
       <CostValue value={data.credits} route={data.route} unit="metered" />
       <span className="caption">
-        {data.per_visit.length} Topic Visit{data.per_visit.length === 1 ? "" : "s"}
+        {data.per_visit.length} question{data.per_visit.length === 1 ? "" : "s"}
         {data.route === "byok" ? " · your own key" : ""}
       </span>
     </Panel>

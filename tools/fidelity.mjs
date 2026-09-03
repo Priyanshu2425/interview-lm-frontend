@@ -68,17 +68,19 @@ await api("/credits/grants", {
   method: "POST",
   body: { candidate_id: CID, credits: 90000, payment_ref: "fid-" + CID },
 });
-const modules = await api(`/corpus/modules?track=aiml&candidate_id=${CID}`);
+const modules = await api(`/skills/modules?track=aiml`);
 const started = await api("/sessions", {
   method: "POST",
-  body: { candidate_id: CID, module_ids: [modules[0].module_id], duration_seconds: 1800 },
+  body: { module_ids: [modules[0].module_id], duration_seconds: 1800 },
 });
 for (let i = 0; i < 6; i++) {
   const r = await api(`/sessions/${started.session_id}/turns`, {
     method: "POST",
     body: { answer: "Scaling keeps the softmax in a region that still has gradient." },
   });
-  if (r?.payload?.kind === "visit_closed" || r?.kind === "visit_closed") break;
+  /* A Session ends rather than closing a Visit: since ISSUE-0042 no turn
+     carries a score, and the loop stops when the plan or the clock runs out. */
+  if (r?.kind === "session_ended" || r?.kind === "session_parked") break;
 }
 /* Two Sessions on purpose. The exchange only exists with a question open, and
    the result and the record only exist once one has closed — a single Session
@@ -86,11 +88,11 @@ for (let i = 0; i < 6; i++) {
    half the drawn surface as missing when it is simply elsewhere. */
 const live = await api("/sessions", {
   method: "POST",
-  body: { candidate_id: CID, module_ids: [modules[0].module_id], duration_seconds: 1800 },
+  body: { module_ids: [modules[0].module_id], duration_seconds: 1800 },
 });
 SCREENS[1].route = `/examination/${live.session_id}`;
 SCREENS[2].route = `/examination/${started.session_id}`;
-SCREENS[3].route = `/evidence/${started.session_id}`;
+SCREENS[3].route = `/report/${started.session_id}`;
 
 for (const width of WIDTHS) {
   console.log(`\n── ${width}px ──────────────────────────────────────────────`);

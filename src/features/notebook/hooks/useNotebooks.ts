@@ -3,7 +3,7 @@ import { notebookService } from "@/lib/services/notebooks";
 import { queryKeys } from "@/lib/query-keys";
 import { useSessionUser } from "@/shared/stores/session";
 import { useToast } from "@/shared/stores/toasts";
-import type { Notebook, SourceUploaded } from "@/shared/types";
+import type { Notebook, NotebookSource, SourceUploaded } from "@/shared/types";
 
 /* How often the Library asks again while a document is being read. The poll is
    doing two jobs: it drives the progress readout, and because an idle host spins
@@ -13,10 +13,16 @@ import type { Notebook, SourceUploaded } from "@/shared/types";
    moment nothing is in flight. */
 const POLL_MS = 1_500;
 
-export function inFlight(notebooks: Notebook[] | undefined): boolean {
-  return (notebooks ?? []).some((n) =>
-    n.sources.some((s) => s.state === "uploaded" || s.state === "ingesting"),
+/* One rule for "is anything still being read", written once. A document is in
+   flight from the moment its bytes land until its Topics are cut. */
+export function inFlightSources(sources: NotebookSource[] | undefined): boolean {
+  return (sources ?? []).some(
+    (s) => s.state === "uploaded" || s.state === "ingesting",
   );
+}
+
+export function inFlight(notebooks: Notebook[] | undefined): boolean {
+  return (notebooks ?? []).some((n) => inFlightSources(n.sources));
 }
 
 export function useNotebooks() {
@@ -29,6 +35,21 @@ export function useNotebooks() {
        awake for nothing, and the free tier allows about one instance. */
     refetchInterval: (query) =>
       inFlight(query.state.data as Notebook[] | undefined) ? POLL_MS : false,
+  });
+}
+
+/* One Library, with each document's state and progress. Polls on the same
+   rule as the listing and for the same reason — the progress readout has to
+   move, and the request keeping an idle host awake is one we need anyway. */
+export function useNotebook(notebookId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.notebooks.one(notebookId ?? "none"),
+    queryFn: () => notebookService.read(notebookId as string),
+    enabled: Boolean(notebookId),
+    refetchInterval: (query) =>
+      inFlightSources((query.state.data as Notebook | undefined)?.sources)
+        ? POLL_MS
+        : false,
   });
 }
 
@@ -50,14 +71,17 @@ export function useNotebookMutations(notebookId: string | undefined) {
   const toast = useToast();
 
   const invalidate = () => {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.notebooks.list(candidateId) });
+    /* Every notebook read, not just the listing: the workbench holds a
+       notebook and an open document under this prefix, and a retry has to
+       refresh all three without naming any of them. */
+    void queryClient.invalidateQueries({ queryKey: queryKeys.notebooks.all });
     /* Adding or removing a Source changes what a Session can be scoped to. */
-    void queryClient.invalidateQueries({ queryKey: queryKeys.corpus.all });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.skills.all });
     void queryClient.invalidateQueries({ queryKey: queryKeys.candidate.credits(candidateId) });
   };
 
   const create = useMutation({
-    mutationFn: (title: string) => notebookService.create(candidateId, title),
+    mutationFn: (title: string) => notebookService.create(title),
     onSuccess: invalidate,
     onError: (e: Error) => toast({ title: "The notebook was not created", body: e.message, tone: "risk" }),
   });

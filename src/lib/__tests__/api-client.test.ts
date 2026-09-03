@@ -19,8 +19,8 @@ describe("the api client", () => {
     } as unknown as Response);
 
     const client = createApiClient("/v1");
-    await expect(client.request("/corpus/tracks")).rejects.toBeInstanceOf(ApiError);
-    await expect(client.request("/corpus/tracks")).rejects.toMatchObject({
+    await expect(client.request("/skills/tracks")).rejects.toBeInstanceOf(ApiError);
+    await expect(client.request("/skills/tracks")).rejects.toMatchObject({
       code: "not_an_api",
     });
   });
@@ -32,7 +32,7 @@ describe("the api client", () => {
     } as unknown as Response);
 
     const client = createApiClient("/v1");
-    await expect(client.request("/corpus/tracks")).resolves.toEqual([{ track_key: "aiml" }]);
+    await expect(client.request("/skills/tracks")).resolves.toEqual([{ track_key: "aiml" }]);
   });
 
   it("keeps an empty body as null rather than refusing it", async () => {

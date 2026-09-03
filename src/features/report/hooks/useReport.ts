@@ -4,34 +4,33 @@ import { candidateService } from "@/lib/services/candidate";
 import { sessionService } from "@/lib/services/sessions";
 import { queryKeys } from "@/lib/query-keys";
 import { useSessionUser } from "@/shared/stores/session";
-import type { Citation, GradingMode, SessionSummary, Spend, TopicReading } from "@/shared/types";
+import type { ReportTopic, SessionReport, Spend } from "@/shared/types";
 
-export interface EvidenceRow extends TopicReading {
-  title: string;
-  moduleTitle: string;
-  gradedBy: GradingMode | null;
-  citations: Citation[];
-  turnCount: number | null;
+/** One reached Topic, with what it cost.
+ *
+ *  Cost is the only thing joined in: the report already carries the title, the
+ *  module, who graded it, how many questions touched it and the spans behind
+ *  them. There is no `turn_count` join any more, and no third read to make it. */
+export interface ReportRow extends ReportTopic {
   credits: number | null;
 }
 
-export interface SessionRecordView {
+export interface ReportView {
   loading: boolean;
   error: string | null;
-  summary: SessionSummary | undefined;
+  report: SessionReport | undefined;
   spend: Spend | undefined;
-  rows: EvidenceRow[];
+  rows: ReportRow[];
 }
 
-/* Three reads, issued together rather than one after another: the summary,
-   the spend ledger and the Session itself do not depend on each other, and
-   waterfalling them would add two round-trips for nothing. */
-export function useSessionRecord(sessionId: string): SessionRecordView {
-  const [summaryQ, spendQ, recordQ] = useQueries({
+/* Two reads, issued together: the reading and the ledger do not depend on each
+   other, and waterfalling them would add a round-trip for nothing. */
+export function useReport(sessionId: string): ReportView {
+  const [reportQ, spendQ] = useQueries({
     queries: [
       {
-        queryKey: queryKeys.session.summary(sessionId),
-        queryFn: () => sessionService.summary(sessionId),
+        queryKey: queryKeys.session.report(sessionId),
+        queryFn: () => sessionService.report(sessionId),
         enabled: Boolean(sessionId),
       },
       {
@@ -39,47 +38,36 @@ export function useSessionRecord(sessionId: string): SessionRecordView {
         queryFn: () => sessionService.spend(sessionId),
         enabled: Boolean(sessionId),
       },
-      {
-        queryKey: queryKeys.session.one(sessionId),
-        queryFn: () => sessionService.get(sessionId),
-        enabled: Boolean(sessionId),
-      },
     ],
   });
 
-  const rows = useMemo<EvidenceRow[]>(() => {
-    const summary = summaryQ.data;
-    if (!summary) return [];
+  const rows = useMemo<ReportRow[]>(() => {
+    const report = reportQ.data;
+    if (!report) return [];
 
-    /* Index once, then look up — the alternative is a nested scan per row. */
+    /* Index once, then look up — the alternative is a nested scan per row.
+       Keyed by `topic_id` rather than by Visit: one question spanning three
+       Topics writes three Evidence rows against a single `topic_visit_id`. */
     const creditsByTopic = new Map<string, number>();
     for (const v of spendQ.data?.per_visit ?? []) {
       if (v.credits === null) continue;
       creditsByTopic.set(v.topic_id, (creditsByTopic.get(v.topic_id) ?? 0) + v.credits);
     }
-    const turnsByTopic = new Map<string, number>();
-    for (const v of recordQ.data?.visits ?? []) {
-      turnsByTopic.set(v.topic_id, (turnsByTopic.get(v.topic_id) ?? 0) + v.turn_count);
-    }
 
-    return summary.per_topic.map((t) => ({
+    return report.topics.map((t) => ({
       ...t,
-      moduleTitle: t.module_title,
-      gradedBy: t.graded_by,
-      turnCount: turnsByTopic.get(t.topic_id) ?? null,
       credits: creditsByTopic.has(t.topic_id) ? creditsByTopic.get(t.topic_id)! : null,
     }));
-  }, [summaryQ.data, spendQ.data, recordQ.data]);
+  }, [reportQ.data, spendQ.data]);
 
   return {
-    loading: summaryQ.isPending,
-    error: summaryQ.error ? (summaryQ.error as Error).message : null,
-    summary: summaryQ.data,
+    loading: reportQ.isPending,
+    error: reportQ.error ? (reportQ.error as Error).message : null,
+    report: reportQ.data,
     spend: spendQ.data,
     rows,
   };
 }
-
 
 /* Where the Candidate stands on one Topic (ADR-0022).
 

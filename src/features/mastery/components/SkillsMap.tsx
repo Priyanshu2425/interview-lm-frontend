@@ -10,7 +10,7 @@ import type { HeatCell } from "@/ui";
    The unasked Topics are unnamed here on purpose: the contract does not
    return the identity of a Topic nobody has been examined on, and inventing
    labels for them would be worse than a truthful blank. */
-export function CorpusMap({ topics, total, onSelect }: {
+export function SkillsMap({ topics, total, onSelect }: {
   topics: TopicReading[];
   total: number;
   onSelect: (topicId: string) => void;

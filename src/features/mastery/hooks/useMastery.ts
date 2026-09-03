@@ -26,7 +26,13 @@ export function useWeakest(limit = 6) {
 /* The per-Module untested breakdown is computed over every reading a
    Candidate has, not just one Session's — so the most recent Session's
    summary is a corpus-wide answer to "what has never been asked", and it is
-   the only route the contract offers to that question. */
+   the only route the contract offers to that question.
+
+   This is why `/summary` survives the report screen moving to `/report`. The
+   report's `planned_not_reached` is a different fact: Topics *this Session*
+   planned and ran out of time for. Corpus-wide-never-asked and
+   planned-but-unreached read alike and are not the same thing, so they are
+   read from the two endpoints that mean them. */
 export function useUntestedModules() {
   const latest = useLatestSession();
   return useQuery({

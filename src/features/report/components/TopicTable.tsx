@@ -1,10 +1,12 @@
 import { Fragment, useState } from "react";
 import type { PaymentRoute } from "@/shared/types";
-import { Coverage, EmptyState, Icon, Reading, Tag } from "@/ui";
+import { Coverage, EmptyState, Icon, Reading, SourceSpan, Tag } from "@/ui";
 import { bandClass } from "@/shared/utils/band";
-import { GRADING_MODE_SHORT, GRADING_MODE_WEIGHT, credits as fmtCredits } from "@/shared/utils/format";
-import type { EvidenceRow } from "../hooks/useSessionRecord";
-import { useTopicStanding } from "../hooks/useSessionRecord";
+import {
+  GRADING_MODE_SHORT, GRADING_MODE_WEIGHT, credits as fmtCredits, score as fmtScore,
+} from "@/shared/utils/format";
+import type { ReportRow } from "../hooks/useReport";
+import { useTopicStanding } from "../hooks/useReport";
 
 /* Where the Candidate stands on this one Topic (ADR-0022).
 
@@ -38,18 +40,22 @@ function Standing({ topicId }: { topicId: string }) {
   );
 }
 
-/* One row per Topic Visit, because the Topic Visit is the unit of evidence:
-   one Visit yields exactly one score and exactly one write, however many
-   Answer Turns it contained. */
-export function EvidenceTable({ rows, route }: { rows: EvidenceRow[]; route: PaymentRoute }) {
+/* One row per Topic reached, because the Topic within a Session is the unit
+   of evidence (ISSUE-0044): one observation per Topic per Session, however
+   many questions touched it and however many Topics one question spanned.
+
+   Only Topics that were reached are here. A Topic the Session never got to is
+   rendered elsewhere, as a name — a different shape entirely, so there is no
+   cell on this table that an absent measurement could fall into as a zero. */
+export function TopicTable({ rows, route }: { rows: ReportRow[]; route: PaymentRoute }) {
   const [openId, setOpenId] = useState<string | null>(null);
 
   if (rows.length === 0) {
     return (
       <EmptyState
         icon="evidence"
-        title="No Topic was graded in this Session"
-        body="A Visit writes its Evidence row when it closes. One that was interrupted stays open until it is graded, so nothing here is missing — it has not happened yet."
+        title="No Topic was reached in this Session"
+        body="The Session is graded once, at the end, from what was actually said. Nothing was said about any Topic, so there is nothing to measure — and nothing was scored zero on the way past."
       />
     );
   }
@@ -58,7 +64,7 @@ export function EvidenceTable({ rows, route }: { rows: EvidenceRow[]; route: Pay
     <div className="table-scroll">
       <table className="table table--evidence">
         <caption className="visually-hidden">
-          Evidence rows for this Session. One row per Topic Visit, with how it was graded, what grounded it,
+          One row per Topic this Session reached, with how it was graded, what grounded it,
           and what it cost.
         </caption>
         <thead>
@@ -67,8 +73,8 @@ export function EvidenceTable({ rows, route }: { rows: EvidenceRow[]; route: Pay
             <th>Topic</th>
             <th style={{ width: 150 }}>Graded</th>
             <th style={{ width: 68 }} className="n">Weight</th>
-            <th style={{ width: 62 }} className="n">Turns</th>
-            <th style={{ width: 158 }}>Reading after</th>
+            <th style={{ width: 78 }} className="n">Questions</th>
+            <th style={{ width: 158 }}>Reading</th>
             <th style={{ width: 88 }} className="n">Cost</th>
           </tr>
         </thead>
@@ -98,18 +104,18 @@ export function EvidenceTable({ rows, route }: { rows: EvidenceRow[]; route: Pay
                         Folding it in buys the width the Cost column needs. */}
                     <span style={{ color: "var(--fg)" }}>{row.title}</span>
                     <span className="caption" style={{ display: "block", marginTop: 2 }}>
-                      {row.moduleTitle || "—"}
+                      {row.module_title || "—"}
                     </span>
                   </td>
                   <td>
-                    {row.gradedBy ? (
-                      <Tag tone={row.gradedBy === "ground_truth" ? "ok" : "neutral"}>
-                        {GRADING_MODE_SHORT[row.gradedBy]}
+                    {row.graded_by ? (
+                      <Tag tone={row.graded_by === "ground_truth" ? "ok" : "neutral"}>
+                        {GRADING_MODE_SHORT[row.graded_by]}
                       </Tag>
                     ) : <span className="caption">—</span>}
                   </td>
-                  <td className="n">{row.gradedBy ? GRADING_MODE_WEIGHT[row.gradedBy] : "—"}</td>
-                  <td className="n">{row.turnCount ?? "—"}</td>
+                  <td className="n">{row.graded_by ? GRADING_MODE_WEIGHT[row.graded_by] : "—"}</td>
+                  <td className="n">{row.question_count}</td>
                   <td>
                     <span className={`score-cell ${bandClass(row.band)}`}>
                       <Reading band={row.band} label={row.label} mastery={row.mastery} size="sm" />
@@ -126,26 +132,42 @@ export function EvidenceTable({ rows, route }: { rows: EvidenceRow[]; route: Pay
                           <span className="eyebrow">What grounded the questions</span>
                           {row.citations.length === 0 ? (
                             <p className="body-sm dim" style={{ margin: 0 }}>
-                              {row.gradedBy === "model_judgment"
+                              {row.graded_by === "model_judgment"
                                 ? "Anchored to a syllabus and grounded in no span. There is nothing to quote, and quoting something anyway would make the record less honest, not more."
                                 : "No span travelled with this row."}
                             </p>
                           ) : (
-                            row.citations.map((c) => (
-                              <div className="source" key={c.chunk_id}>
-                                <div className="eyebrow">{c.title || c.source_id}</div>
-                                <p className="source-span">{c.text}</p>
-                                <div className="source-ref">
-                                  {c.page === null ? null : <span>p. {c.page}</span>}
-                                  <span>chunk {c.chunk_id}</span>
-                                </div>
-                              </div>
-                            ))
+                            row.citations.map((c) => <SourceSpan citation={c} key={c.chunk_id} />)
                           )}
                         </div>
 
                         <div className="stack g-5">
-                          <span className="eyebrow">The reading this Visit produced</span>
+                          <span className="eyebrow">What the Judge read</span>
+                          {/* Two dimensions, apart, always. How much of the
+                              material the answer explained is one question and
+                              how close to correct it was is another, and the
+                              average of two different questions answers
+                              neither. The number they were combined into fed
+                              the posterior and is not a reading — the API does
+                              not carry it out here, and nothing on this screen
+                              may put them back together. */}
+                          <div className="stack g-5">
+                            <div className="between">
+                              <span className="body-sm dim">Explained the material</span>
+                              <strong className="mono">{fmtScore(row.source_score)}</strong>
+                            </div>
+                            <div className="between">
+                              <span className="body-sm dim">Close to correct</span>
+                              <strong className="mono">{fmtScore(row.truth_score)}</strong>
+                            </div>
+                          </div>
+                          <p className="caption" style={{ margin: 0 }}>
+                            {row.source_score === null
+                              ? "Graded on the interviewer's own knowledge, so there was no supplied material to have explained — and a zero there would read as having explained none of it."
+                              : "Two readings, reported apart. They are not averaged into a score here or anywhere else."}
+                          </p>
+
+                          <span className="eyebrow">Where the Topic stands now</span>
                           <div className={`stack g-5 ${bandClass(row.band)}`}>
                             <div className="between">
                               <span className="body-sm dim">Coverage</span>
@@ -168,7 +190,7 @@ export function EvidenceTable({ rows, route }: { rows: EvidenceRow[]; route: Pay
                           </div>
                           <p className="caption" style={{ margin: 0 }}>
                             {row.mastery === null
-                              ? "Still below the Evidence Floor after this Visit. Untested is a fact about the evidence, not a score."
+                              ? "Still below the Evidence Floor. Untested is a fact about the evidence, not a score."
                               : "Coverage and Mastery are two readings taken from one distribution. They are never fused."}
                           </p>
                           <Standing topicId={row.topic_id} />
