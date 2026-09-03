@@ -65,6 +65,19 @@ export default defineConfig({
       "/v1": { target: process.env.API_ORIGIN ?? "http://127.0.0.1:8000", changeOrigin: true },
     },
   },
+  /* The dictation worker pulls Transformers.js in through a dynamic `import()`,
+     so those megabytes are fetched by somebody about to speak and by nobody
+     else. Vite's default worker format is `iife`, which cannot do dynamic
+     imports at all — without this the build fails outright. */
+  worker: { format: "es" },
+  optimizeDeps: {
+    /* The package's browser entry is one pre-bundled multi-megabyte file.
+       Dep-optimising it is slow and rewrites the
+       `new URL(..., import.meta.url)` patterns the ONNX runtime uses to locate
+       its own wasm, which surfaces in dev as a full page reload the first time
+       a worker is spawned. */
+    exclude: ["@huggingface/transformers"],
+  },
   build: {
     outDir: "dist",
     sourcemap: true,
@@ -72,7 +85,12 @@ export default defineConfig({
       output: {
         /* The Beta renderer and the corpus-scale views are the only heavy
            chunks; keeping vendor separate keeps the examination route's
-           payload from being re-downloaded on every deploy. */
+           payload from being re-downloaded on every deploy.
+
+           Transformers.js is deliberately absent. It is only ever reached from
+           inside the worker, which Vite emits as its own asset outside this
+           graph — naming it here would pull it back into the main one and
+           undo the whole point of the worker. */
         manualChunks: {
           react: ["react", "react-dom", "react-router-dom"],
           query: ["@tanstack/react-query"],

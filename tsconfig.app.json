@@ -19,5 +19,8 @@
     "baseUrl": ".",
     "paths": { "@/*": ["./src/*"] }
   },
-  "include": ["src"]
+  "include": ["src"],
+  /* Compiled by `tsconfig.worker.json` instead: it is a worker global, not a
+     DOM one, and typing it as both is how `self` stops meaning anything. */
+  "exclude": ["src/features/dictation/whisper/worker.ts"]
 }

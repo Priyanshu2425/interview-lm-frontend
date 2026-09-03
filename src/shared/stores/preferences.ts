@@ -13,13 +13,27 @@ export interface Preferences {
   defaultDuration: number;
   openGroundingFirst: boolean;
   confirmBeforeEnding: boolean;
+  dictationEngine: DictationEngine;
 }
+
+/** How a Candidate's speech becomes text, where they have said (ISSUE-0052).
+ *
+ *  `auto` is the default and is not a shrug: it picks an arm from the
+ *  Candidate's own id, so it holds steady across their Sessions — somebody
+ *  asked which of two experiences was better needs to have had one of them,
+ *  not a coin flip per question.
+ *
+ *  `whisper` runs in this browser and the audio never leaves it. `webspeech`
+ *  sends the audio to the browser's own vendor to be written down. `off` means
+ *  typing, which is what somebody on a metered connection wants. */
+export type DictationEngine = "auto" | "whisper" | "webspeech" | "off";
 
 export const DEFAULT_PREFERENCES: Preferences = {
   provider: "deepseek",
   defaultDuration: 3000,
   openGroundingFirst: true,
   confirmBeforeEnding: true,
+  dictationEngine: "auto",
 };
 
 const STORAGE_KEY = "ilm.prefs.v2";

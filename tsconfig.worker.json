@@ -1,0 +1,22 @@
+/* The worker is a different global.
+ *
+ * `WebWorker` cannot go into `tsconfig.app.json`: merging
+ * `DedicatedWorkerGlobalScope` into every component file redefines `self`,
+ * `postMessage` and `addEventListener`, and the errors it produces point
+ * everywhere except at the cause. So the worker gets its own project, `tsc -b`
+ * covers both, and `protocol.ts` is shared — which is why that file names no
+ * DOM type at all.
+ */
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "WebWorker"],
+    "types": ["vite/client"],
+    "composite": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.worker.tsbuildinfo"
+  },
+  "include": [
+    "src/features/dictation/whisper/worker.ts",
+    "src/features/dictation/whisper/protocol.ts"
+  ]
+}
