@@ -25,12 +25,22 @@ export const sessionService = {
   /* Long-running: it returns when the graph next parks. Idempotent on its key,
      so a mashed button, a dropped connection and a refresh converge on one
      Answer Turn. */
-  submitTurn: (sessionId: string, answer: string, turnIndex: number) =>
+  submitTurn: (sessionId: string, answer: string, turnIndex: number, spoken = false) =>
     api.request<TurnResult>(endpoints.sessions.turns(sessionId), {
       method: "POST",
-      body: { answer },
+      body: { answer, spoken },
       headers: { "Idempotency-Key": turnKey(sessionId, turnIndex) },
     }),
+
+  /* The Candidate is ready; the deadline starts here (ISSUE-0050). A Session
+     exists from `start` above, because the plan is fixed before anything can be
+     asked — but they are not sitting it yet, and a timed examination that
+     counted our setup would be charging them for it. Idempotent, because this
+     is a button. */
+  begin: (sessionId: string) =>
+    api.request<{ session_id: string; clock_started_at: string | null }>(
+      endpoints.sessions.begin(sessionId), { method: "POST" },
+    ),
 
   get: (sessionId: string) => api.request<SessionRecord>(endpoints.sessions.one(sessionId)),
 

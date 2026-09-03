@@ -24,6 +24,10 @@ export const endpoints = {
   sessions: {
     list: () => "/sessions",
     create: () => "/sessions",
+    /* Not the same moment as `create`. The Session exists first, because the
+       plan is fixed before anything can be asked; the clock starts here, when
+       the Candidate says they are ready (ISSUE-0050). */
+    begin: (id: string) => `/sessions/${id}/begin`,
     one: (id: string) => `/sessions/${id}`,
     turns: (id: string) => `/sessions/${id}/turns`,
     resume: (id: string) => `/sessions/${id}/resume`,

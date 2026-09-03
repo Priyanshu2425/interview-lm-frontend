@@ -36,6 +36,15 @@ const ROLE_OF_MESSAGE = (m: TranscriptMessage): TurnRole =>
 let turnSeq = 0;
 const nextTurnId = () => `turn-${++turnSeq}`;
 
+/* An answer, and how it arrived. Held together rather than as two refs because
+   a retry has to resend both — the same key must converge on the same turn,
+   and a turn that changed from spoken to typed on the way would be a different
+   claim about what happened (ISSUE-0049). */
+interface PendingAnswer {
+  answer: string;
+  spoken: boolean;
+}
+
 export interface ExaminationState {
   loading: boolean;
   /* The failure that stopped the read, rendered from the API's own message. */
@@ -60,7 +69,7 @@ export interface ExaminationState {
   /* Every Topic the current question spans. A compressed item spans up to
      three, and naming one of them would be a lie about what is being asked. */
   topicTitles: string[];
-  submit: (answer: string) => void;
+  submit: (answer: string, spoken?: boolean) => void;
   retry: () => void;
   resume: () => void;
   resuming: boolean;
@@ -85,7 +94,7 @@ export function useExamination(sessionId: string): ExaminationState {
      advances when a turn has actually landed, so a retry after a timeout
      converges on the same Answer Turn rather than opening a second one. */
   const turnIndex = useRef(0);
-  const pendingAnswer = useRef<string | null>(null);
+  const pendingAnswer = useRef<PendingAnswer | null>(null);
 
   const record = useQuery({
     queryKey: queryKeys.session.one(sessionId),
@@ -184,7 +193,10 @@ export function useExamination(sessionId: string): ExaminationState {
   }, [markEnded, sessionId]);
 
   const turn = useMutation({
-    mutationFn: (answer: string) => sessionService.submitTurn(sessionId, answer, turnIndex.current),
+    mutationFn: (pending: PendingAnswer) =>
+      sessionService.submitTurn(
+        sessionId, pending.answer, turnIndex.current, pending.spoken,
+      ),
     onSuccess: (result) => {
       turnIndex.current += 1;
       pendingAnswer.current = null;
@@ -259,12 +271,17 @@ export function useExamination(sessionId: string): ExaminationState {
     if (endedReason) onSessionOver();
   }, [endedReason, onSessionOver]);
 
-  const submit = useCallback((answer: string) => {
+  /* `spoken` says the text is a transcription rather than something typed. It
+     stays true even when the Candidate corrected the transcript before sending
+     — it is still a machine's reading of a voice, which is the question the
+     flag exists to answer (ISSUE-0049). Defaulted, so the typing composer's
+     call site is unchanged. */
+  const submit = useCallback((answer: string, spoken = false) => {
     const text = answer.trim();
     if (!text) return;
-    pendingAnswer.current = text;
+    pendingAnswer.current = { answer: text, spoken };
     setTurns((prev) => [...prev, { id: nextTurnId(), role: "you", text }]);
-    turn.mutate(text);
+    turn.mutate(pendingAnswer.current);
   }, [turn]);
 
   const retry = useCallback(() => {

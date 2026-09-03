@@ -223,6 +223,11 @@ export interface SessionRecord {
   parked_reason: string | null;
   ended_reason: string | null;
   duration_seconds: number;
+  /** When the Candidate pressed Begin, which is not when the Session was
+   *  created (ISSUE-0050). The timer counts from here. Null means they never
+   *  began — the deadline is not running, and a Session that shows a countdown
+   *  off this being null is counting down something that has not started. */
+  clock_started_at: string | null;
   provider: string | null;
   payment_route: PaymentRoute;
   visits: SessionVisit[];
@@ -344,6 +349,10 @@ export interface TranscriptMessage {
   topic_ids: string[];
   topic_visit_id: string | null;
   plan_item_id: string | null;
+  /** Said out loud and transcribed, rather than typed (ISSUE-0049). Never true
+   *  of an interviewer's turn. It records how the words arrived and says
+   *  nothing about how good they were — no reading is weighted by it. */
+  spoken: boolean;
 }
 
 export interface SessionTranscript {
