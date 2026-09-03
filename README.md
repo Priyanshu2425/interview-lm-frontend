@@ -136,6 +136,17 @@ src/
 └── test/setup.ts
 ```
 
+## Code Practices
+
+See [CODE_PRACTICES.md](./CODE_PRACTICES.md) for comprehensive coding guidelines including:
+- Import conventions and path aliases
+- Component patterns (named functions, no inline definitions)
+- State management (local, Zustand, TanStack Query)
+- Data fetching patterns (parallel queries, dependent queries)
+- Performance optimization (memoization, code splitting)
+- Testing patterns
+- CSS and styling conventions
+
 ## What is decided, and enforced here
 
 - **The surface computes nothing.** Bands, Mastery, Coverage and Grading Modes
