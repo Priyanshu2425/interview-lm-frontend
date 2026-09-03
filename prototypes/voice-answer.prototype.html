@@ -10,6 +10,15 @@
   the arrow keys. The state strip on the right of the switcher steps through
   every state the machine can be in — press 1-9, or click.
 
+  >> SETTLED: VARIANT A. The other two are kept because the argument for A is
+  >> only legible next to them.
+  >>
+  >> One thing changed after it was picked: the 60MB download is NOT here any
+  >> more. It happened at Session start, before the clock, on the screen in
+  >> `interview-setup.prototype.html` — so by the time this composer exists the
+  >> model is warm and the first state below is the rare one, not the first
+  >> one everybody sees.
+
   THE QUESTION
   ------------
   An Answer Turn is currently a textarea and a submit. Typing an answer to a
@@ -57,9 +66,11 @@
   * Is the audio kept? Right now nothing leaves the browser, so there is no
     recording to appeal a bad transcription against. That is a privacy win and
     an evidence loss, and it is a product call, not a UI one.
-  * A 60MB model download on first visit. Every variant blocks the composer
-    until it is ready, and every variant offers typing as the way through —
-    a Candidate mid-Session on hotel wifi cannot be made to wait.
+  * ~~A 60MB model download on first visit.~~ SETTLED: it moved to Session
+    start, where the clock is not running yet — see
+    `interview-setup.prototype.html`. What survives here is the rare case
+    where setup was skipped or did not finish, and it still offers typing as
+    the way through: a Candidate mid-Session cannot be made to wait.
   * Typing never goes away. It is the fallback for a denied microphone, a
     failed model load, a noisy room, and for anybody who cannot or will not
     speak. "Substitute" means the default, not the only way.
@@ -360,7 +371,7 @@ function levels(n, t, live) {
    Every one of these is a real state the machine can be in, and each variant
    has to answer all of them. Naming them is most of the design work. */
 const STATES = [
-  ["loading",   "Model downloading (60MB, first visit)"],
+  ["loading",   "Still warming (rare — setup was skipped)"],
   ["idle",      "Ready — nothing said yet"],
   ["listening", "Listening"],
   ["thinking",  "Transcribing"],
@@ -435,23 +446,26 @@ const modeSwitch = (mode) => `
     <button aria-pressed="${mode === "type"}" data-mode="type">Type</button>
   </span>`;
 
+/* The rare one. Setup normally finishes this before the clock starts, so a
+   Candidate who sees this either skipped it or arrived faster than their
+   network. It does not mention megabytes: they are mid-examination and the
+   only fact that helps them is that they can type right now. */
 const loadingBox = (pct) => `
   <div class="vbox" data-busy>
     <div class="load">
       <div class="between">
-        <span class="eyebrow">Preparing to listen</span>
+        <span class="eyebrow">Nearly ready to hear you</span>
         <span class="mono dim">${pct}%</span>
       </div>
       <div class="meter"><i style="width:${pct}%"></i></div>
       <p class="caption">
-        The model that turns speech into text runs in this browser and never leaves it —
-        60MB, once. It is cached after this, so every later Session starts listening
-        immediately.
+        This finishes setting up in the background. Do not wait for it — type this answer
+        and speak the next one.
       </p>
     </div>
     <div class="vbox-foot">
-      <span class="caption">You do not have to wait.</span>
-      <button class="btn btn--sm" data-mode="type">Type this answer instead</button>
+      <span class="caption">The clock is running.</span>
+      <button class="btn btn--primary btn--sm" data-mode="type">Type this answer</button>
     </div>
   </div>`;
 
