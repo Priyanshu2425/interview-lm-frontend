@@ -1,0 +1,712 @@
+<!doctype html>
+<html lang="en" data-theme="graphite">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE — the Notebook screen</title>
+<!--
+  THROWAWAY. Three variants of /notebook, switchable with ?variant=A|B|C,
+  the bottom bar, or the ← → arrow keys.
+
+  The question: what should the Notebook screen be, now that it holds only a
+  Candidate's own uploads and one opened notebook shows its source beside what
+  was extracted from it?
+
+  Data is fake and shaped like the real tables — notebook_source (title, state,
+  progress, text), notebook_topic (title, order, dossier_tokens) and
+  notebook_chunk (page, char_start, char_end), which is what makes the
+  span-highlighting in variant C real rather than decorative.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --t-38:2.375rem;--t-30:1.875rem;--t-24:1.5rem;--t-20:1.25rem;--t-18:1.125rem;
+  --t-16:1rem;--t-14:.875rem;--t-13:.8125rem;--t-12:.75rem;--t-11:.6875rem;
+  --lh-tight:1.14;--lh-snug:1.32;--lh-body:1.62;--lh-loose:1.85;--ls-caps:.09em;--ls-tight:-.02em;
+  --s-1:2px;--s-2:4px;--s-3:6px;--s-4:8px;--s-5:12px;--s-6:16px;--s-7:20px;--s-8:24px;
+  --s-9:32px;--s-10:40px;--s-11:56px;--s-12:72px;--s-13:96px;
+  --r-xs:4px;--r-sm:6px;--r-md:10px;--r-lg:14px;--r-full:999px;--bw-hair:1px;--bw-thick:2px;
+  --d-1:110ms;--d-2:170ms;--d-3:260ms;--e-out:cubic-bezier(.16,1,.3,1);
+  --h-topbar:56px;--w-rail:232px;--w-panel:348px;--w-wrap:1320px;
+
+  --bg:oklch(.170 .006 265);--surface:oklch(.205 .007 265);--surface-2:oklch(.252 .009 265);
+  --surface-3:oklch(.300 .010 265);
+  --fg:oklch(.962 .003 265);--fg-2:oklch(.840 .006 265);--muted:oklch(.672 .012 265);--faint:oklch(.580 .012 265);
+  --border:oklch(.270 .009 265);--border-2:oklch(.310 .010 265);
+  --accent:oklch(.800 .150 190);--accent-hov:oklch(.865 .140 190);
+  --accent-soft:oklch(.800 .150 190/.14);--accent-line:oklch(.800 .150 190/.42);
+  --on-accent:oklch(.180 .024 190);
+  --risk:oklch(.680 .190 24);--warn:oklch(.812 .148 78);--ok:oklch(.770 .135 158);
+  --font-display:"Space Grotesk",system-ui,sans-serif;
+  --font-body:Inter,system-ui,-apple-system,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--fg-2);font-family:var(--font-body);
+  font-size:var(--t-14);line-height:var(--lh-body);
+  -webkit-font-smoothing:antialiased;padding-bottom:var(--s-13);
+}
+h1,h2,h3,h4{font-family:var(--font-display);color:var(--fg);margin:0;letter-spacing:var(--ls-tight);line-height:var(--lh-tight)}
+.h1{font-size:var(--t-30)}.h2{font-size:var(--t-24)}.h3{font-size:var(--t-20)}.h4{font-size:var(--t-18)}
+p{margin:0}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.mono{font-family:var(--font-mono);font-size:var(--t-12)}
+.eyebrow{font-family:var(--font-mono);font-size:var(--t-11);letter-spacing:var(--ls-caps);
+  text-transform:uppercase;color:var(--muted);display:block}
+.caption{font-size:var(--t-12);color:var(--muted);line-height:var(--lh-body)}
+.dim{color:var(--muted)}
+.hair-t{border-top:var(--bw-hair) solid var(--border)}
+.hair-b{border-bottom:var(--bw-hair) solid var(--border)}
+.row{display:flex;align-items:center;gap:var(--s-4)}
+.between{display:flex;align-items:center;justify-content:space-between;gap:var(--s-5)}
+.stack{display:grid}
+.g4{gap:var(--s-4)}.g5{gap:var(--s-5)}.g6{gap:var(--s-6)}.g7{gap:var(--s-7)}.g8{gap:var(--s-8)}
+.mt4{margin-top:var(--s-4)}.mt5{margin-top:var(--s-5)}.mt6{margin-top:var(--s-6)}
+.mt8{margin-top:var(--s-8)}.mt9{margin-top:var(--s-9)}
+
+/* ---- shell ------------------------------------------------------------ */
+.app{display:grid;grid-template-columns:var(--w-rail) 1fr;min-height:100vh}
+.rail{border-right:var(--bw-hair) solid var(--border);background:var(--surface);
+  padding:var(--s-6) var(--s-5);display:flex;flex-direction:column;gap:var(--s-8)}
+.brand{display:flex;align-items:center;gap:var(--s-4);color:var(--fg);font-family:var(--font-display);
+  font-weight:600;letter-spacing:var(--ls-tight)}
+.brand-mark{width:24px;height:24px;border-radius:var(--r-xs);background:var(--accent);
+  color:var(--on-accent);display:grid;place-items:center;font-size:var(--t-13)}
+.nav{display:grid;gap:var(--s-1)}
+.nav a{display:flex;align-items:center;gap:var(--s-5);padding:var(--s-4) var(--s-5);
+  border-radius:var(--r-sm);color:var(--muted);text-decoration:none;font-size:var(--t-13)}
+.nav a:hover{background:var(--surface-2);color:var(--fg-2)}
+.nav a[aria-current]{background:var(--surface-2);color:var(--fg)}
+.nav a[aria-current] .dot{background:var(--accent)}
+.dot{width:5px;height:5px;border-radius:var(--r-full);background:var(--faint)}
+.topbar{height:var(--h-topbar);border-bottom:var(--bw-hair) solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;gap:var(--s-6);
+  padding:0 var(--s-9);position:sticky;top:0;background:color-mix(in oklch,var(--bg) 88%,transparent);
+  backdrop-filter:blur(8px);z-index:20}
+.main{min-width:0;display:flex;flex-direction:column}
+.pad{padding:var(--s-9)}
+.wrap{max-width:var(--w-wrap);width:100%}
+
+/* ---- controls --------------------------------------------------------- */
+.btn{display:inline-flex;align-items:center;gap:var(--s-4);height:36px;padding:0 var(--s-6);
+  border-radius:var(--r-sm);border:var(--bw-hair) solid var(--border-2);color:var(--fg-2);
+  font-size:var(--t-13);transition:background var(--d-1),border-color var(--d-1),color var(--d-1)}
+.btn:hover{background:var(--surface-2);color:var(--fg)}
+.btn--primary{background:var(--accent);color:var(--on-accent);border-color:transparent;font-weight:500}
+.btn--primary:hover{background:var(--accent-hov);color:var(--on-accent)}
+.btn--sm{height:28px;padding:0 var(--s-5);font-size:var(--t-12)}
+.btn--ghost{border-color:transparent}
+.tag{display:inline-flex;align-items:center;gap:var(--s-3);height:22px;padding:0 var(--s-4);
+  border-radius:var(--r-full);border:var(--bw-hair) solid var(--border-2);
+  font-family:var(--font-mono);font-size:var(--t-11);color:var(--muted);white-space:nowrap}
+.tag[data-tone=ok]{color:var(--ok);border-color:color-mix(in oklch,var(--ok) 40%,transparent)}
+.tag[data-tone=warn]{color:var(--warn);border-color:color-mix(in oklch,var(--warn) 40%,transparent)}
+.tag[data-tone=risk]{color:var(--risk);border-color:color-mix(in oklch,var(--risk) 40%,transparent)}
+.tag[data-tone=accent]{color:var(--accent);border-color:var(--accent-line)}
+.panel{background:var(--surface);border:var(--bw-hair) solid var(--border);border-radius:var(--r-md)}
+.meter{height:3px;border-radius:var(--r-full);background:var(--surface-3);overflow:hidden}
+.meter>i{display:block;height:100%;background:var(--accent);transition:width var(--d-3) var(--e-out)}
+
+/* ---- dropzone --------------------------------------------------------- */
+.drop{border:var(--bw-hair) dashed var(--border-2);border-radius:var(--r-md);
+  padding:var(--s-9);text-align:center;color:var(--muted);background:var(--surface);
+  transition:border-color var(--d-1),background var(--d-1)}
+.drop:hover{border-color:var(--accent-line);background:var(--surface-2)}
+.drop strong{color:var(--fg);font-family:var(--font-display);font-weight:500;display:block;
+  font-size:var(--t-18);margin-bottom:var(--s-3)}
+.drop--slim{padding:var(--s-6);text-align:left;display:flex;align-items:center;
+  justify-content:space-between;gap:var(--s-6)}
+.drop--slim strong{font-size:var(--t-14);margin:0}
+
+/* ---- notebook rows / cards -------------------------------------------- */
+.nb-row{display:grid;grid-template-columns:auto 1fr auto;gap:var(--s-6);align-items:center;
+  padding:var(--s-7);text-align:left;width:100%;border-bottom:var(--bw-hair) solid var(--border);
+  transition:background var(--d-1)}
+.nb-row:last-child{border-bottom:0}
+.nb-row:hover{background:var(--surface-2)}
+.nb-row[aria-current]{background:var(--surface-2)}
+.nb-glyph{width:38px;height:38px;border-radius:var(--r-sm);background:var(--surface-2);
+  border:var(--bw-hair) solid var(--border-2);display:grid;place-items:center;
+  font-family:var(--font-mono);font-size:var(--t-11);color:var(--muted)}
+.nb-title{display:block;color:var(--fg);font-size:var(--t-16);
+  font-family:var(--font-display);font-weight:500;line-height:var(--lh-snug)}
+.nb-sub{display:block;font-size:var(--t-12);color:var(--muted);margin-top:var(--s-2)}
+.grid{display:grid;gap:var(--s-6);grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+.card{padding:var(--s-7);text-align:left;display:grid;gap:var(--s-6);align-content:start;
+  transition:border-color var(--d-1),background var(--d-1)}
+.card:hover{border-color:var(--border-2);background:var(--surface-2)}
+
+/* ---- two-pane reader --------------------------------------------------- */
+.reader{display:grid;grid-template-columns:1fr minmax(320px,var(--w-panel));
+  gap:0;border-top:var(--bw-hair) solid var(--border);min-height:0;flex:1}
+.reader--wide{grid-template-columns:1fr minmax(300px,420px)}
+.pane{min-width:0;display:flex;flex-direction:column}
+.pane+.pane{border-left:var(--bw-hair) solid var(--border)}
+.pane-head{padding:var(--s-6) var(--s-8);border-bottom:var(--bw-hair) solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;gap:var(--s-5);
+  position:sticky;top:0;background:var(--bg);z-index:5}
+.pane-body{padding:var(--s-8);overflow:auto;max-height:calc(100vh - var(--h-topbar) - 120px)}
+.doc{font-size:var(--t-14);line-height:var(--lh-loose);color:var(--fg-2);max-width:70ch}
+.doc h4{font-size:var(--t-16);margin:var(--s-8) 0 var(--s-4);color:var(--fg)}
+.doc p{margin:0 0 var(--s-6)}
+.doc .pg{font-family:var(--font-mono);font-size:var(--t-11);color:var(--faint);
+  letter-spacing:var(--ls-caps);text-transform:uppercase;display:block;margin:var(--s-9) 0 var(--s-5);
+  padding-top:var(--s-5);border-top:var(--bw-hair) solid var(--border)}
+
+/* a span the extractor drew a Topic from */
+.span{border-radius:var(--r-xs);transition:background var(--d-2),box-shadow var(--d-2)}
+.span[data-lit]{background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
+.span[data-dim]{opacity:.42}
+
+/* ---- outline ----------------------------------------------------------- */
+.mod{border-bottom:var(--bw-hair) solid var(--border);padding:var(--s-6) 0}
+.mod:first-child{padding-top:0}
+.mod:last-child{border-bottom:0}
+.mod-head{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s-5)}
+.mod-title{color:var(--fg);font-family:var(--font-display);font-weight:500;font-size:var(--t-14)}
+.topics{list-style:none;margin:var(--s-5) 0 0;padding:0;display:grid;gap:var(--s-1)}
+.topic{display:grid;grid-template-columns:auto 1fr auto;gap:var(--s-5);align-items:baseline;
+  width:100%;text-align:left;padding:var(--s-4) var(--s-5);border-radius:var(--r-sm);
+  border-left:var(--bw-thick) solid transparent;transition:background var(--d-1),border-color var(--d-1)}
+.topic:hover{background:var(--surface-2)}
+.topic[aria-pressed=true]{background:var(--surface-2);border-left-color:var(--accent)}
+.topic-n{font-family:var(--font-mono);font-size:var(--t-11);color:var(--faint)}
+.topic-t{font-size:var(--t-13);color:var(--fg-2)}
+.topic[aria-pressed=true] .topic-t{color:var(--fg)}
+.topic-k{font-family:var(--font-mono);font-size:var(--t-11);color:var(--faint)}
+
+/* source list inside the reader */
+.srcs{display:grid;gap:var(--s-1)}
+.src{display:grid;grid-template-columns:auto 1fr auto;gap:var(--s-5);align-items:center;
+  padding:var(--s-5);border-radius:var(--r-sm);text-align:left;width:100%;
+  border-left:var(--bw-thick) solid transparent}
+.src:hover{background:var(--surface-2)}
+.src[aria-current]{background:var(--surface-2);border-left-color:var(--accent)}
+.src-t{font-size:var(--t-13);color:var(--fg-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.src[aria-current] .src-t{color:var(--fg)}
+.ext{font-family:var(--font-mono);font-size:var(--t-11);color:var(--faint);
+  border:var(--bw-hair) solid var(--border-2);border-radius:var(--r-xs);padding:1px 4px}
+
+.empty{display:grid;gap:var(--s-5);justify-items:center;text-align:center;padding:var(--s-12) var(--s-8);
+  color:var(--muted)}
+.empty strong{color:var(--fg);font-family:var(--font-display);font-size:var(--t-18);font-weight:500}
+
+/* ---- the prototype switcher (not part of the design) ------------------- */
+.switch{position:fixed;left:50%;bottom:var(--s-7);transform:translateX(-50%);z-index:999;
+  display:flex;align-items:center;gap:var(--s-2);padding:var(--s-3);border-radius:var(--r-full);
+  background:oklch(.98 0 0);color:oklch(.18 0 0);
+  box-shadow:0 8px 30px rgb(0 0 0/.5);font-family:var(--font-mono);font-size:var(--t-12)}
+.switch button{width:30px;height:30px;border-radius:var(--r-full);display:grid;place-items:center;
+  color:oklch(.30 0 0)}
+.switch button:hover{background:oklch(.90 0 0)}
+.switch .lbl{padding:0 var(--s-5);white-space:nowrap;font-weight:500}
+.switch .hint{padding-right:var(--s-5);color:oklch(.45 0 0);border-left:1px solid oklch(.85 0 0);
+  padding-left:var(--s-5)}
+@media(max-width:900px){
+  .app{grid-template-columns:1fr}.rail{display:none}
+  .reader{grid-template-columns:1fr}.pane+.pane{border-left:0;border-top:var(--bw-hair) solid var(--border)}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<div class="switch" role="group" aria-label="Prototype variant">
+  <button id="prev" aria-label="Previous variant">‹</button>
+  <span class="lbl" id="lbl">A</span>
+  <button id="next" aria-label="Next variant">›</button>
+  <span class="hint">← → to switch · prototype only</span>
+</div>
+
+<script>
+/* ============================================================ fake data ===
+   Shaped like the real tables. `text` is notebook_source.text; `topics` is
+   notebook_topic; the paragraph→topic mapping stands in for notebook_chunk's
+   (char_start, char_end, page), which is what makes span highlighting real. */
+const NOTEBOOKS = [
+  {
+    id: "nb_7f21", title: "Deep Learning Specialisation — my notes",
+    added: "3 days ago", visibility: "personal",
+    sources: [
+      {
+        id: "src_a1", title: "week-03-backprop.pdf", ext: "PDF", state: "ready",
+        bytes: "1.4 MB", pages: 12, module_id: "nb-mod-311", module_title: "Training a network",
+        topics: [
+          { id: "t1", n: 1, title: "The chain rule through a layer", tokens: 1840 },
+          { id: "t2", n: 2, title: "Gradient descent and the update rule", tokens: 2210 },
+          { id: "t3", n: 3, title: "Vanishing and exploding gradients", tokens: 1360 },
+        ],
+        body: [
+          { p: 1, t: "t1", h: "Backpropagation", x: "Training a network means adjusting every weight in the direction that reduces the loss. Backpropagation is how the gradient of the loss with respect to each weight is obtained without recomputing the whole forward pass for every parameter." },
+          { p: 1, t: "t1", x: "The method is the chain rule applied layer by layer, from the output backwards. Each layer receives the derivative of the loss with respect to its own output, and passes back the derivative with respect to its input." },
+          { p: 2, t: "t2", h: "The update", x: "Once the gradient is known, the weights move against it by a small step. That step size is the learning rate, and it is the single hyperparameter most likely to make training diverge when it is set carelessly." },
+          { p: 2, t: "t2", x: "Stochastic gradient descent estimates the gradient from a minibatch rather than the whole dataset. The estimate is noisy, and the noise is useful: it lets the optimiser leave sharp minima that a full-batch estimate would settle into." },
+          { p: 3, t: "t3", h: "When gradients misbehave", x: "In a deep stack the chain rule multiplies many terms together. If those terms are consistently below one the gradient shrinks toward zero before it reaches the early layers; if consistently above one it grows without bound." },
+          { p: 3, t: "t3", x: "Normalisation layers, residual connections and careful initialisation all address the same underlying problem: keeping the magnitude of the signal roughly constant as it passes through depth." },
+        ],
+      },
+      {
+        id: "src_a2", title: "week-04-attention.md", ext: "MD", state: "ready",
+        bytes: "62 KB", pages: 6, module_id: "nb-mod-312", module_title: "Attention and transformers",
+        topics: [
+          { id: "t4", n: 1, title: "Scaled dot-product attention", tokens: 2040 },
+          { id: "t5", n: 2, title: "Why the scaling factor exists", tokens: 980 },
+          { id: "t6", n: 3, title: "Multi-head attention", tokens: 1610 },
+        ],
+        body: [
+          { p: 1, t: "t4", h: "Attention", x: "Attention computes a weighted average of value vectors, where the weights come from the similarity between a query and each key. Nothing about the operation is sequential, which is what lets a transformer process a whole sequence at once." },
+          { p: 1, t: "t4", x: "The similarity is a dot product, turned into weights by a softmax over the key positions." },
+          { p: 2, t: "t5", h: "The scaling factor", x: "Dot products grow with dimension. For large key dimensions the products land far from zero, the softmax saturates, and the gradient through it becomes vanishingly small." },
+          { p: 2, t: "t5", x: "Dividing by the square root of the key dimension keeps the products in a region where the softmax still has gradient. It is a variance argument, not a heuristic." },
+          { p: 3, t: "t6", h: "Several heads", x: "One attention operation can only express one notion of relevance. Multi-head attention runs several in parallel on projected subspaces and concatenates the results, so different heads can attend to different relationships." },
+        ],
+      },
+      {
+        id: "src_a3", title: "lecture-recording-05.mp4", ext: "MP4", state: "stub",
+        bytes: "220 MB", pages: 0, module_id: "—", module_title: "—",
+        stub_reason: "no extractable text — a recording is not examinable on its own",
+        topics: [], body: [],
+      },
+      {
+        id: "src_a4", title: "week-05-optimisers.pdf", ext: "PDF", state: "ingesting",
+        bytes: "2.1 MB", pages: 18, module_id: "nb-mod-313", module_title: "Optimisers",
+        done: 14, total: 40, topics: [], body: [],
+      },
+    ],
+  },
+  {
+    id: "nb_c904", title: "System design interview prep", added: "last week", visibility: "personal",
+    sources: [
+      {
+        id: "src_b1", title: "caching-strategies.md", ext: "MD", state: "ready",
+        bytes: "38 KB", pages: 4, module_id: "nb-mod-401", module_title: "Caching",
+        topics: [
+          { id: "t7", n: 1, title: "Read-through and write-through", tokens: 1450 },
+          { id: "t8", n: 2, title: "Invalidation and staleness", tokens: 1720 },
+        ],
+        body: [
+          { p: 1, t: "t7", h: "Where the cache sits", x: "A read-through cache is consulted first and populates itself on a miss. A write-through cache is updated on every write, so a read after a write cannot see a stale value — at the cost of writing twice." },
+          { p: 1, t: "t7", x: "The choice is about which failure you would rather have: a slow first read, or a slow every-write." },
+          { p: 2, t: "t8", h: "Invalidation", x: "There are only two hard problems, and this is one of them. A cache with no invalidation strategy is a correctness bug with good latency." },
+          { p: 2, t: "t8", x: "Time-to-live is the cheapest strategy and the least precise: it bounds how stale a value can be without knowing whether it is stale at all." },
+        ],
+      },
+      {
+        id: "src_b2", title: "load-balancing.pdf", ext: "PDF", state: "failed",
+        bytes: "900 KB", pages: 9, module_id: "nb-mod-402", module_title: "Load balancing",
+        stub_reason: "the embedder stopped answering partway through",
+        topics: [], body: [],
+      },
+    ],
+  },
+  {
+    id: "nb_2b7e", title: "Papers I keep meaning to read", added: "a month ago", visibility: "personal",
+    sources: [
+      {
+        id: "src_c1", title: "attention-is-all-you-need.pdf", ext: "PDF", state: "ready",
+        bytes: "2.2 MB", pages: 15, module_id: "nb-mod-501", module_title: "The transformer paper",
+        topics: [
+          { id: "t9", n: 1, title: "Encoder–decoder structure", tokens: 2600 },
+          { id: "t10", n: 2, title: "Positional encoding", tokens: 1180 },
+        ],
+        body: [
+          { p: 1, t: "t9", h: "Architecture", x: "The transformer keeps the encoder–decoder shape of earlier sequence models and removes the recurrence entirely, replacing it with stacked self-attention and position-wise feed-forward layers." },
+          { p: 2, t: "t10", h: "Position", x: "With no recurrence and no convolution, nothing in the model knows the order of the sequence. Positional encodings are added to the input embeddings so that order is recoverable." },
+        ],
+      },
+    ],
+  },
+];
+
+const STATE = {
+  ready:     { label: "Ready",    tone: "ok"     },
+  ingesting: { label: "Reading",  tone: "accent" },
+  uploaded:  { label: "Waiting",  tone: "accent" },
+  failed:    { label: "Failed",   tone: "risk"   },
+  stub:      { label: "Unusable", tone: "warn"   },
+};
+
+/* ------------------------------------------------------------- helpers -- */
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+const ready = (nb) => nb.sources.filter((s) => s.state === "ready");
+const topicCount = (nb) => ready(nb).reduce((n, s) => n + s.topics.length, 0);
+const moduleCount = (nb) => new Set(ready(nb).map((s) => s.module_id)).size;
+const busy = (nb) => nb.sources.some((s) => s.state === "ingesting" || s.state === "uploaded");
+const problem = (nb) => nb.sources.filter((s) => s.state === "failed" || s.state === "stub").length;
+
+const tag = (state) => {
+  const s = STATE[state];
+  return `<span class="tag" data-tone="${s.tone}">${s.label}</span>`;
+};
+
+/* what a notebook is, in one line, without a fused figure */
+const nbLine = (nb) => {
+  const bits = [`${nb.sources.length} document${nb.sources.length === 1 ? "" : "s"}`];
+  if (moduleCount(nb)) bits.push(`${moduleCount(nb)} module${moduleCount(nb) === 1 ? "" : "s"}`);
+  if (topicCount(nb)) bits.push(`${topicCount(nb)} topics`);
+  return bits.join(" · ");
+};
+
+/* ------------------------------------------------------------- app state - */
+let ui = { variant: "A", nb: null, src: null, topic: null };
+
+function openNotebook(id) {
+  const nb = NOTEBOOKS.find((n) => n.id === id);
+  ui.nb = id;
+  ui.src = (ready(nb)[0] ?? nb.sources[0])?.id ?? null;
+  ui.topic = null;
+  render();
+}
+function selectSource(id) { ui.src = id; ui.topic = null; render(); }
+function toggleTopic(id) { ui.topic = ui.topic === id ? null : id; render(); }
+function closeNotebook() { ui.nb = null; ui.src = null; ui.topic = null; render(); }
+
+const currentNb = () => NOTEBOOKS.find((n) => n.id === ui.nb) ?? null;
+const currentSrc = () => currentNb()?.sources.find((s) => s.id === ui.src) ?? null;
+
+/* --------------------------------------------------------------- pieces -- */
+function shell(main) {
+  return `
+  <div class="app">
+    <aside class="rail">
+      <div class="brand"><span class="brand-mark">I</span> InterviewLM</div>
+      <nav class="nav">
+        <a href="#" aria-current="page"><span class="dot"></span>Notebook</a>
+        <a href="#"><span class="dot"></span>Session</a>
+        <a href="#"><span class="dot"></span>Examination</a>
+        <a href="#"><span class="dot"></span>Mastery</a>
+        <a href="#"><span class="dot"></span>Report</a>
+      </nav>
+      <div style="margin-top:auto" class="caption">
+        Your documents only. Shared Skills are chosen when you set up a Session.
+      </div>
+    </aside>
+    <div class="main">${main}</div>
+  </div>`;
+}
+
+/* the source preview — one pane, shared by every variant */
+function docPane(src, { lit = null, showHead = true } = {}) {
+  if (!src) return `<div class="empty"><strong>No document chosen</strong></div>`;
+  if (src.state !== "ready") {
+    return `
+      <div class="empty">
+        <strong>Nothing to read yet</strong>
+        <p class="caption" style="max-width:44ch">
+          ${src.state === "ingesting"
+            ? `This document is being read now — ${src.done} of ${src.total} sections.`
+            : esc(src.stub_reason ?? "")}
+        </p>
+        ${src.state === "failed" ? `<button class="btn btn--sm">Try reading it again</button>` : ""}
+      </div>`;
+  }
+  let page = 0;
+  const body = src.body.map((b) => {
+    const brk = b.p !== page ? (page = b.p, `<span class="pg">page ${b.p}</span>`) : "";
+    const state = lit ? (b.t === lit ? ' data-lit=""' : ' data-dim=""') : "";
+    const head = b.h ? `<h4>${esc(b.h)}</h4>` : "";
+    return `${brk}${head}<p class="span"${state} data-topic="${b.t}">${esc(b.x)}</p>`;
+  }).join("");
+  return `
+    ${showHead ? `<div class="pane-head">
+      <div class="row"><span class="ext">${src.ext}</span>
+        <span style="color:var(--fg)">${esc(src.title)}</span></div>
+      <span class="caption mono">${src.pages} pages · ${src.bytes}</span>
+    </div>` : ""}
+    <div class="pane-body"><div class="doc">${body}</div></div>`;
+}
+
+/* the extraction — modules and their topics */
+function outlinePane(src, { title = "What was extracted" } = {}) {
+  if (!src || src.state !== "ready") {
+    return `
+      <div class="pane-head"><span class="eyebrow">${title}</span></div>
+      <div class="pane-body"><div class="empty">
+        <strong>Nothing extracted</strong>
+        <p class="caption" style="max-width:40ch">
+          A document becomes examinable once it has been read into Topics. Until then it is
+          kept, and listed, and nothing more.
+        </p>
+      </div></div>`;
+  }
+  const topics = src.topics.map((t) => `
+    <li><button class="topic" aria-pressed="${ui.topic === t.id}" onclick="toggleTopic('${t.id}')">
+      <span class="topic-n">${String(t.n).padStart(2, "0")}</span>
+      <span class="topic-t">${esc(t.title)}</span>
+      <span class="topic-k">${t.tokens.toLocaleString()} tok</span>
+    </button></li>`).join("");
+  return `
+    <div class="pane-head">
+      <span class="eyebrow">${title}</span>
+      <span class="caption mono">${src.topics.length} topics</span>
+    </div>
+    <div class="pane-body">
+      <div class="mod">
+        <div class="mod-head">
+          <span class="mod-title">${esc(src.module_title)}</span>
+          <span class="caption mono">${esc(src.module_id)}</span>
+        </div>
+        <p class="caption mt4">
+          One module, drawn from this document. Choosing it as a Session's scope examines
+          the Topics below.
+        </p>
+        <ul class="topics">${topics}</ul>
+      </div>
+      <p class="caption mt6">
+        ${ui.topic
+          ? "Highlighted on the left: the spans this Topic was drawn from."
+          : "Select a Topic to see the spans it came from."}
+      </p>
+    </div>`;
+}
+
+function srcList(nb) {
+  return `<div class="srcs">` + nb.sources.map((s) => `
+    <button class="src" ${ui.src === s.id ? 'aria-current="true"' : ""} onclick="selectSource('${s.id}')">
+      <span class="ext">${s.ext}</span>
+      <span class="src-t">${esc(s.title)}</span>
+      ${tag(s.state)}
+    </button>`).join("") + `</div>`;
+}
+
+const uploadWide = `
+  <button class="drop" style="width:100%">
+    <strong>Drop documents here</strong>
+    <span class="caption">PDF, Markdown, a pasted note or a URL. They are read into Topics you can be examined on.</span>
+  </button>`;
+
+const uploadSlim = `
+  <button class="drop drop--slim" style="width:100%">
+    <span><strong>Add documents</strong>
+      <span class="caption" style="display:block">PDF, Markdown, a note or a URL</span></span>
+    <span class="btn btn--sm">Choose files</span>
+  </button>`;
+
+/* =========================================================== VARIANT A ====
+   THE READER. A quiet list, and opening one takes the whole screen.
+   The library and the notebook are two places; you are in exactly one. */
+function variantA() {
+  const nb = currentNb();
+  if (!nb) {
+    return shell(`
+      <div class="topbar"><h1 class="h3">Notebook</h1>
+        <button class="btn btn--primary btn--sm">Add documents</button></div>
+      <div class="pad wrap stack g8">
+        <div>
+          <span class="eyebrow">Your material</span>
+          <h2 class="h1 mt4">Everything you have brought.</h2>
+          <p class="caption mt5" style="max-width:60ch">
+            Documents you upload are read into Modules and Topics, and those are what a Session
+            can examine you on. Nothing here is shared, and nothing here is anybody else's.
+          </p>
+        </div>
+        ${uploadWide}
+        <div class="panel">
+          ${NOTEBOOKS.map((n) => `
+            <button class="nb-row" onclick="openNotebook('${n.id}')">
+              <span class="nb-glyph">${n.sources.length}</span>
+              <span>
+                <span class="nb-title">${esc(n.title)}</span>
+                <span class="nb-sub">${nbLine(n)} · added ${n.added}</span>
+              </span>
+              <span class="row">
+                ${busy(n) ? `<span class="tag" data-tone="accent">Reading</span>` : ""}
+                ${problem(n) ? `<span class="tag" data-tone="warn">${problem(n)} need attention</span>` : ""}
+                <span class="caption mono">open ›</span>
+              </span>
+            </button>`).join("")}
+        </div>
+      </div>`);
+  }
+  const src = currentSrc();
+  return shell(`
+    <div class="topbar">
+      <div class="row">
+        <button class="btn btn--ghost btn--sm" onclick="closeNotebook()">‹ All notebooks</button>
+        <span style="color:var(--fg);font-family:var(--font-display);font-weight:500">${esc(nb.title)}</span>
+      </div>
+      <div class="row"><span class="caption mono">${nbLine(nb)}</span>
+        <button class="btn btn--sm">Add documents</button></div>
+    </div>
+    <div class="pad hair-b" style="padding-bottom:var(--s-6)">${srcList(nb)}</div>
+    <div class="reader">
+      <div class="pane">${docPane(src, { lit: ui.topic })}</div>
+      <div class="pane">${outlinePane(src)}</div>
+    </div>`);
+}
+
+/* =========================================================== VARIANT B ====
+   THE WORKBENCH. Three columns, nothing ever navigates away: notebooks and
+   their documents on the left, the document in the middle, what came out of
+   it on the right. Built for moving between documents quickly. */
+function variantB() {
+  const nb = currentNb() ?? NOTEBOOKS[0];
+  if (!ui.nb) { ui.nb = nb.id; ui.src = (ready(nb)[0] ?? nb.sources[0]).id; }
+  const src = currentSrc();
+  return shell(`
+    <div class="topbar">
+      <h1 class="h3">Notebook</h1>
+      <div class="row">
+        <span class="caption mono">${NOTEBOOKS.length} notebooks · your uploads only</span>
+        <button class="btn btn--primary btn--sm">Add documents</button>
+      </div>
+    </div>
+    <div class="reader reader--wide" style="grid-template-columns:280px 1fr minmax(300px,380px)">
+      <div class="pane">
+        <div class="pane-head"><span class="eyebrow">Your notebooks</span></div>
+        <div class="pane-body" style="padding:var(--s-5)">
+          ${NOTEBOOKS.map((n) => `
+            <div style="margin-bottom:var(--s-6)">
+              <button class="src" style="padding:var(--s-4) var(--s-5)"
+                      ${ui.nb === n.id ? 'aria-current="true"' : ""}
+                      onclick="openNotebook('${n.id}')">
+                <span class="ext">${n.sources.length}</span>
+                <span class="src-t" style="font-family:var(--font-display);font-weight:500">${esc(n.title)}</span>
+                <span></span>
+              </button>
+              ${ui.nb === n.id ? `<div style="padding-left:var(--s-6);margin-top:var(--s-3)">${srcList(n)}</div>` : ""}
+            </div>`).join("")}
+          <div style="margin-top:var(--s-7)">${uploadSlim}</div>
+        </div>
+      </div>
+      <div class="pane">${docPane(src, { lit: ui.topic })}</div>
+      <div class="pane">${outlinePane(src)}</div>
+    </div>`);
+}
+
+/* =========================================================== VARIANT C ====
+   THE ANNOTATED SOURCE. The document is the hero and the extraction is an
+   annotation over it: every Topic is a highlighted region of the page, and
+   the outline is a legend for the highlighting rather than a second list.
+   For answering "did it read my document correctly?" */
+function variantC() {
+  const nb = currentNb();
+  if (!nb) {
+    return shell(`
+      <div class="topbar"><h1 class="h3">Notebook</h1>
+        <button class="btn btn--primary btn--sm">Add documents</button></div>
+      <div class="pad wrap stack g8">
+        <div class="between">
+          <div>
+            <span class="eyebrow">Your material</span>
+            <h2 class="h1 mt4">Three notebooks.</h2>
+          </div>
+          <div style="max-width:340px">${uploadSlim}</div>
+        </div>
+        <div class="grid">
+          ${NOTEBOOKS.map((n) => `
+            <button class="panel card" onclick="openNotebook('${n.id}')">
+              <div class="between">
+                <span class="nb-glyph">${n.sources.length}</span>
+                ${busy(n) ? `<span class="tag" data-tone="accent">Reading</span>`
+                          : problem(n) ? `<span class="tag" data-tone="warn">${problem(n)} to fix</span>`
+                          : `<span class="tag" data-tone="ok">Ready</span>`}
+              </div>
+              <div>
+                <span class="nb-title">${esc(n.title)}</span>
+                <span class="nb-sub">added ${n.added}</span>
+              </div>
+              <div class="stack g4">
+                ${[...n.sources].sort((a, b) =>
+                    (a.state === "ingesting" || a.state === "uploaded" ? 0 : 1) -
+                    (b.state === "ingesting" || b.state === "uploaded" ? 0 : 1)
+                  ).slice(0, 3).map((s) => `
+                  <div class="row" style="gap:var(--s-5)">
+                    <span class="ext">${s.ext}</span>
+                    <span class="src-t" style="flex:1">${esc(s.title)}</span>
+                    ${s.state === "ingesting"
+                      ? `<span class="caption mono">${s.done}/${s.total}</span>`
+                      : tag(s.state)}
+                  </div>
+                  ${s.state === "ingesting"
+                    ? `<div class="meter"><i style="width:${Math.round(100*s.done/s.total)}%"></i></div>` : ""}
+                `).join("")}
+                ${n.sources.length > 3 ? `<span class="caption">and ${n.sources.length - 3} more</span>` : ""}
+              </div>
+              <div class="hair-t" style="padding-top:var(--s-5)">
+                <span class="caption">${nbLine(n)}</span>
+              </div>
+            </button>`).join("")}
+        </div>
+      </div>`);
+  }
+  const src = currentSrc();
+  return shell(`
+    <div class="topbar">
+      <div class="row">
+        <button class="btn btn--ghost btn--sm" onclick="closeNotebook()">‹ Notebooks</button>
+        <span style="color:var(--fg);font-family:var(--font-display);font-weight:500">${esc(nb.title)}</span>
+      </div>
+      <div class="row">
+        ${nb.sources.map((s) => `
+          <button class="btn btn--sm ${ui.src === s.id ? "btn--primary" : "btn--ghost"}"
+                  onclick="selectSource('${s.id}')">${esc(s.title)}</button>`).join("")}
+      </div>
+    </div>
+    <div class="reader" style="grid-template-columns:1fr minmax(300px,340px)">
+      <div class="pane">
+        <div class="pane-head">
+          <div class="row"><span class="ext">${src?.ext ?? ""}</span>
+            <span style="color:var(--fg)">${esc(src?.title ?? "")}</span></div>
+          <span class="caption">${ui.topic ? "Showing one Topic's spans" : "Every Topic highlighted"}</span>
+        </div>
+        <div class="pane-body">
+          <div class="doc">
+            ${src && src.state === "ready" ? (() => {
+              let page = 0;
+              return src.body.map((b) => {
+                const brk = b.p !== page ? (page = b.p, `<span class="pg">page ${b.p}</span>`) : "";
+                const lit = !ui.topic || ui.topic === b.t;
+                const state = lit ? ' data-lit=""' : ' data-dim=""';
+                return `${brk}${b.h ? `<h4>${esc(b.h)}</h4>` : ""}
+                        <p class="span"${state}>${esc(b.x)}</p>`;
+              }).join("");
+            })() : docPane(src, { showHead: false })}
+          </div>
+        </div>
+      </div>
+      <div class="pane">${outlinePane(src, { title: "The Topics drawn from it" })}</div>
+    </div>`);
+}
+
+/* --------------------------------------------------------------- render -- */
+const VARIANTS = {
+  A: { name: "Reader — list, then a full-screen notebook", fn: variantA },
+  B: { name: "Workbench — three columns, nothing navigates", fn: variantB },
+  C: { name: "Annotated source — the document is the hero", fn: variantC },
+};
+const KEYS = Object.keys(VARIANTS);
+
+function render() {
+  document.getElementById("root").innerHTML = VARIANTS[ui.variant].fn();
+  document.getElementById("lbl").textContent = `${ui.variant} — ${VARIANTS[ui.variant].name}`;
+}
+function setVariant(k) {
+  ui.variant = k; ui.nb = null; ui.src = null; ui.topic = null;
+  const u = new URL(location.href); u.searchParams.set("variant", k);
+  history.replaceState({}, "", u);
+  render();
+}
+function cycle(step) {
+  const i = KEYS.indexOf(ui.variant);
+  setVariant(KEYS[(i + step + KEYS.length) % KEYS.length]);
+}
+document.getElementById("prev").onclick = () => cycle(-1);
+document.getElementById("next").onclick = () => cycle(1);
+addEventListener("keydown", (e) => {
+  const el = document.activeElement;
+  if (el && /^(INPUT|TEXTAREA)$/.test(el.tagName)) return;
+  if (e.key === "ArrowLeft") cycle(-1);
+  if (e.key === "ArrowRight") cycle(1);
+});
+
+ui.variant = KEYS.includes(new URL(location.href).searchParams.get("variant"))
+  ? new URL(location.href).searchParams.get("variant") : "A";
+render();
+</script>
+</body>
+</html>

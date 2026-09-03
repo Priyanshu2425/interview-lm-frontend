@@ -1,0 +1,650 @@
+<!doctype html>
+<html lang="en" data-theme="graphite">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE — the Session screen</title>
+<!--
+  THROWAWAY. Three variants of what the Examination tab becomes, switchable
+  with ?variant=A|B|C, the bottom bar, or the arrow keys.
+
+  The question: the tab is called Examination and shows an empty state unless a
+  Session happens to be running. It should be Session — the Sessions you have
+  run, and the way to start another.
+
+  The hard part is what a row says. A Session has NO overall figure: Coverage
+  and Mastery are two readings of one Topic, and a Session is not a Topic
+  (`SessionReport` has no score, mastery or coverage field, and that absence is
+  tested). So a row reports what happened — when, how long, how much of the
+  plan was asked, how many Topics were measured — and never how well.
+
+  Three states that are genuinely different: running (resumable), ended
+  (graded, has a report), parked (waiting, and NOT graded — topping up resumes
+  it, so a report would be a result it has not earned).
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+
+
+:root{
+  --t-38:2.375rem;--t-30:1.875rem;--t-24:1.5rem;--t-20:1.25rem;--t-18:1.125rem;
+  --t-16:1rem;--t-14:.875rem;--t-13:.8125rem;--t-12:.75rem;--t-11:.6875rem;
+  --lh-tight:1.14;--lh-snug:1.32;--lh-body:1.62;--lh-loose:1.85;--ls-caps:.09em;--ls-tight:-.02em;
+  --s-1:2px;--s-2:4px;--s-3:6px;--s-4:8px;--s-5:12px;--s-6:16px;--s-7:20px;--s-8:24px;
+  --s-9:32px;--s-10:40px;--s-11:56px;--s-12:72px;--s-13:96px;
+  --r-xs:4px;--r-sm:6px;--r-md:10px;--r-lg:14px;--r-full:999px;--bw-hair:1px;--bw-thick:2px;
+  --d-1:110ms;--d-2:170ms;--d-3:260ms;--e-out:cubic-bezier(.16,1,.3,1);
+  --h-topbar:56px;--w-rail:232px;--w-panel:348px;--w-wrap:1320px;
+
+  --bg:oklch(.170 .006 265);--surface:oklch(.205 .007 265);--surface-2:oklch(.252 .009 265);
+  --surface-3:oklch(.300 .010 265);
+  --fg:oklch(.962 .003 265);--fg-2:oklch(.840 .006 265);--muted:oklch(.672 .012 265);--faint:oklch(.580 .012 265);
+  --border:oklch(.270 .009 265);--border-2:oklch(.310 .010 265);
+  --accent:oklch(.800 .150 190);--accent-hov:oklch(.865 .140 190);
+  --accent-soft:oklch(.800 .150 190/.14);--accent-line:oklch(.800 .150 190/.42);
+  --on-accent:oklch(.180 .024 190);
+  --risk:oklch(.680 .190 24);--warn:oklch(.812 .148 78);--ok:oklch(.770 .135 158);
+  --font-display:"Space Grotesk",system-ui,sans-serif;
+  --font-body:Inter,system-ui,-apple-system,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--fg-2);font-family:var(--font-body);
+  font-size:var(--t-14);line-height:var(--lh-body);
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{font-family:var(--font-display);color:var(--fg);margin:0;letter-spacing:var(--ls-tight);line-height:var(--lh-tight)}
+.h1{font-size:var(--t-30)}.h2{font-size:var(--t-24)}.h3{font-size:var(--t-20)}.h4{font-size:var(--t-18)}
+p{margin:0}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.mono{font-family:var(--font-mono);font-size:var(--t-12)}
+.eyebrow{font-family:var(--font-mono);font-size:var(--t-11);letter-spacing:var(--ls-caps);
+  text-transform:uppercase;color:var(--muted);display:block}
+.caption{font-size:var(--t-12);color:var(--muted);line-height:var(--lh-body)}
+.dim{color:var(--muted)}
+.hair-t{border-top:var(--bw-hair) solid var(--border)}
+.hair-b{border-bottom:var(--bw-hair) solid var(--border)}
+.row{display:flex;align-items:center;gap:var(--s-4)}
+.between{display:flex;align-items:center;justify-content:space-between;gap:var(--s-5)}
+.stack{display:grid}
+.g4{gap:var(--s-4)}.g5{gap:var(--s-5)}.g6{gap:var(--s-6)}.g7{gap:var(--s-7)}.g8{gap:var(--s-8)}
+.mt4{margin-top:var(--s-4)}.mt5{margin-top:var(--s-5)}.mt6{margin-top:var(--s-6)}
+.mt8{margin-top:var(--s-8)}.mt9{margin-top:var(--s-9)}
+
+/* ---- shell ------------------------------------------------------------ */
+.app{display:grid;grid-template-columns:var(--w-rail) 1fr;height:100vh;overflow:hidden}
+.rail{overflow:auto;border-right:var(--bw-hair) solid var(--border);background:var(--surface);
+  padding:var(--s-6) var(--s-5);display:flex;flex-direction:column;gap:var(--s-8)}
+.brand{display:flex;align-items:center;gap:var(--s-4);color:var(--fg);font-family:var(--font-display);
+  font-weight:600;letter-spacing:var(--ls-tight)}
+.brand-mark{width:24px;height:24px;border-radius:var(--r-xs);background:var(--accent);
+  color:var(--on-accent);display:grid;place-items:center;font-size:var(--t-13)}
+.nav{display:grid;gap:var(--s-1)}
+.nav a{display:flex;align-items:center;gap:var(--s-5);padding:var(--s-4) var(--s-5);
+  border-radius:var(--r-sm);color:var(--muted);text-decoration:none;font-size:var(--t-13)}
+.nav a:hover{background:var(--surface-2);color:var(--fg-2)}
+.nav a[aria-current]{background:var(--surface-2);color:var(--fg)}
+.nav a[aria-current] .dot{background:var(--accent)}
+.dot{width:5px;height:5px;border-radius:var(--r-full);background:var(--faint)}
+.topbar{height:var(--h-topbar);border-bottom:var(--bw-hair) solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;gap:var(--s-6);
+  padding:0 var(--s-9);position:sticky;top:0;background:color-mix(in oklch,var(--bg) 88%,transparent);
+  backdrop-filter:blur(8px);z-index:20}
+.main{min-width:0;min-height:0;display:flex;flex-direction:column;overflow:auto}
+.pad{padding:var(--s-9)}
+.wrap{max-width:var(--w-wrap);width:100%}
+
+/* ---- controls --------------------------------------------------------- */
+.btn{text-decoration:none;display:inline-flex;align-items:center;gap:var(--s-4);height:36px;padding:0 var(--s-6);
+  border-radius:var(--r-sm);border:var(--bw-hair) solid var(--border-2);color:var(--fg-2);
+  font-size:var(--t-13);transition:background var(--d-1),border-color var(--d-1),color var(--d-1)}
+.btn:hover{background:var(--surface-2);color:var(--fg)}
+.btn--primary{background:var(--accent);color:var(--on-accent);border-color:transparent;font-weight:500}
+.btn--primary:hover{background:var(--accent-hov);color:var(--on-accent)}
+.btn--sm{height:28px;padding:0 var(--s-5);font-size:var(--t-12)}
+.btn--ghost{border-color:transparent}
+.tag{display:inline-flex;align-items:center;gap:var(--s-3);height:22px;padding:0 var(--s-4);
+  border-radius:var(--r-full);border:var(--bw-hair) solid var(--border-2);
+  font-family:var(--font-mono);font-size:var(--t-11);color:var(--muted);white-space:nowrap}
+.tag[data-tone=ok]{color:var(--ok);border-color:color-mix(in oklch,var(--ok) 40%,transparent)}
+.tag[data-tone=warn]{color:var(--warn);border-color:color-mix(in oklch,var(--warn) 40%,transparent)}
+.tag[data-tone=risk]{color:var(--risk);border-color:color-mix(in oklch,var(--risk) 40%,transparent)}
+.tag[data-tone=accent]{color:var(--accent);border-color:var(--accent-line)}
+.panel{background:var(--surface);border:var(--bw-hair) solid var(--border);border-radius:var(--r-md)}
+.meter{height:3px;border-radius:var(--r-full);background:var(--surface-3);overflow:hidden}
+.meter>i{display:block;height:100%;background:var(--accent);transition:width var(--d-3) var(--e-out)}
+
+/* ---- dropzone --------------------------------------------------------- */
+.drop{border:var(--bw-hair) dashed var(--border-2);border-radius:var(--r-md);
+  padding:var(--s-9);text-align:center;color:var(--muted);background:var(--surface);
+  transition:border-color var(--d-1),background var(--d-1)}
+.drop:hover{border-color:var(--accent-line);background:var(--surface-2)}
+.drop strong{color:var(--fg);font-family:var(--font-display);font-weight:500;display:block;
+  font-size:var(--t-18);margin-bottom:var(--s-3)}
+.drop--slim{padding:var(--s-6);text-align:left;display:flex;align-items:center;
+  justify-content:space-between;gap:var(--s-6)}
+.drop--slim strong{font-size:var(--t-14);margin:0}
+
+/* ---- notebook rows / cards -------------------------------------------- */
+.nb-row{display:grid;grid-template-columns:auto 1fr auto;gap:var(--s-6);align-items:center;
+  padding:var(--s-7);text-align:left;width:100%;border-bottom:var(--bw-hair) solid var(--border);
+  transition:background var(--d-1)}
+.nb-row:last-child{border-bottom:0}
+.nb-row:hover{background:var(--surface-2)}
+.nb-row[aria-current]{background:var(--surface-2)}
+.nb-glyph{width:38px;height:38px;border-radius:var(--r-sm);background:var(--surface-2);
+  border:var(--bw-hair) solid var(--border-2);display:grid;place-items:center;
+  font-family:var(--font-mono);font-size:var(--t-11);color:var(--muted)}
+.nb-title{display:block;color:var(--fg);font-size:var(--t-16);
+  font-family:var(--font-display);font-weight:500;line-height:var(--lh-snug)}
+.nb-sub{display:block;font-size:var(--t-12);color:var(--muted);margin-top:var(--s-2)}
+.grid{display:grid;gap:var(--s-6);grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+.card{padding:var(--s-7);text-align:left;display:grid;gap:var(--s-6);align-content:start;
+  transition:border-color var(--d-1),background var(--d-1)}
+.card:hover{border-color:var(--border-2);background:var(--surface-2)}
+
+/* ---- two-pane reader --------------------------------------------------- */
+.reader{display:grid;grid-template-columns:1fr minmax(320px,var(--w-panel));
+  gap:0;border-top:var(--bw-hair) solid var(--border);min-height:0;flex:1}
+.reader--wide{grid-template-columns:1fr minmax(300px,420px)}
+.pane{min-width:0;display:flex;flex-direction:column}
+.pane+.pane{border-left:var(--bw-hair) solid var(--border)}
+.pane-head{padding:var(--s-6) var(--s-8);border-bottom:var(--bw-hair) solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;gap:var(--s-5);
+  position:sticky;top:0;background:var(--bg);z-index:5}
+.pane-body{padding:var(--s-8);overflow:auto;max-height:calc(100vh - var(--h-topbar) - 120px)}
+.doc{font-size:var(--t-14);line-height:var(--lh-loose);color:var(--fg-2);max-width:70ch}
+.doc h4{font-size:var(--t-16);margin:var(--s-8) 0 var(--s-4);color:var(--fg)}
+.doc p{margin:0 0 var(--s-6)}
+.doc .pg{font-family:var(--font-mono);font-size:var(--t-11);color:var(--faint);
+  letter-spacing:var(--ls-caps);text-transform:uppercase;display:block;margin:var(--s-9) 0 var(--s-5);
+  padding-top:var(--s-5);border-top:var(--bw-hair) solid var(--border)}
+
+/* a span the extractor drew a Topic from */
+.span{border-radius:var(--r-xs);transition:background var(--d-2),box-shadow var(--d-2)}
+.span[data-lit]{background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
+.span[data-dim]{opacity:.42}
+
+/* ---- outline ----------------------------------------------------------- */
+.mod{border-bottom:var(--bw-hair) solid var(--border);padding:var(--s-6) 0}
+.mod:first-child{padding-top:0}
+.mod:last-child{border-bottom:0}
+.mod-head{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s-5)}
+.nowrap{white-space:nowrap}
+.mod-title{color:var(--fg);font-family:var(--font-display);font-weight:500;font-size:var(--t-14)}
+.topics{list-style:none;margin:var(--s-5) 0 0;padding:0;display:grid;gap:var(--s-1)}
+.topic{display:grid;grid-template-columns:auto 1fr auto;gap:var(--s-5);align-items:baseline;
+  width:100%;text-align:left;padding:var(--s-4) var(--s-5);border-radius:var(--r-sm);
+  border-left:var(--bw-thick) solid transparent;transition:background var(--d-1),border-color var(--d-1)}
+.topic:hover{background:var(--surface-2)}
+.topic[aria-pressed=true]{background:var(--surface-2);border-left-color:var(--accent)}
+.topic-n{font-family:var(--font-mono);font-size:var(--t-11);color:var(--faint)}
+.topic-t{font-size:var(--t-13);color:var(--fg-2)}
+.topic[aria-pressed=true] .topic-t{color:var(--fg)}
+.topic-k{font-family:var(--font-mono);font-size:var(--t-11);color:var(--faint)}
+
+/* source list inside the reader */
+.srcs{display:grid;gap:var(--s-1)}
+.src{display:grid;grid-template-columns:auto 1fr auto;gap:var(--s-5);align-items:center;
+  padding:var(--s-5);border-radius:var(--r-sm);text-align:left;width:100%;
+  border-left:var(--bw-thick) solid transparent}
+.src:hover{background:var(--surface-2)}
+.src[aria-current]{background:var(--surface-2);border-left-color:var(--accent)}
+.src-t{font-size:var(--t-13);color:var(--fg-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.src[aria-current] .src-t{color:var(--fg)}
+.ext{font-family:var(--font-mono);font-size:var(--t-11);color:var(--faint);
+  border:var(--bw-hair) solid var(--border-2);border-radius:var(--r-xs);padding:1px 4px}
+
+.empty{display:grid;gap:var(--s-5);justify-items:center;text-align:center;padding:var(--s-12) var(--s-8);
+  color:var(--muted)}
+.empty strong{color:var(--fg);font-family:var(--font-display);font-size:var(--t-18);font-weight:500}
+
+/* ---- the prototype switcher (not part of the design) ------------------- */
+.switch{position:fixed;left:50%;bottom:var(--s-7);transform:translateX(-50%);z-index:999;
+  display:flex;align-items:center;gap:var(--s-2);padding:var(--s-3);border-radius:var(--r-full);
+  background:oklch(.98 0 0);color:oklch(.18 0 0);
+  box-shadow:0 8px 30px rgb(0 0 0/.5);font-family:var(--font-mono);font-size:var(--t-12)}
+.switch button{width:30px;height:30px;border-radius:var(--r-full);display:grid;place-items:center;
+  color:oklch(.30 0 0)}
+.switch button:hover{background:oklch(.90 0 0)}
+.switch .lbl{padding:0 var(--s-5);white-space:nowrap;font-weight:500}
+.switch .hint{padding-right:var(--s-5);color:oklch(.45 0 0);border-left:1px solid oklch(.85 0 0);
+  padding-left:var(--s-5)}
+@media(max-width:900px){
+  .app{grid-template-columns:1fr}.rail{display:none}
+  .reader{grid-template-columns:1fr}.pane+.pane{border-left:0;border-top:var(--bw-hair) solid var(--border)}
+}
+
+
+/* ---- the sessions list --------------------------------------------------- */
+.wrap { max-width: var(--w-wrap); width: 100%; }
+
+/* One Session, as a row. */
+.ses {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--s-6); align-items: center; width: 100%; text-align: left;
+  padding: var(--s-6) var(--s-7);
+  border-bottom: var(--bw-hair) solid var(--border);
+  transition: background var(--d-1);
+}
+.ses:last-child { border-bottom: 0; }
+.ses:hover { background: var(--surface-2); }
+.ses-when { color: var(--fg); font-size: var(--t-14); font-family: var(--font-display); font-weight: 500; }
+.ses-sub { display: block; margin-top: var(--s-2); font-size: var(--t-12); color: var(--muted); }
+.ses-mark {
+  width: 34px; height: 34px; border-radius: var(--r-full);
+  display: grid; place-items: center; font-family: var(--font-mono); font-size: var(--t-11);
+  background: var(--surface-2); border: var(--bw-hair) solid var(--border-2); color: var(--muted);
+}
+.ses[data-state="running"] .ses-mark { border-color: var(--accent); color: var(--accent); }
+.ses[data-state="parked"] .ses-mark { border-color: var(--warn); color: var(--warn); }
+
+/* The table variant. Facts in columns, because a list of twenty is scanned
+   down rather than read across. */
+.table-scroll { overflow-x: auto; }
+table.t { width: 100%; border-collapse: collapse; font-size: var(--t-13); }
+table.t th {
+  text-align: left; font-family: var(--font-mono); font-size: var(--t-11);
+  letter-spacing: var(--ls-caps); text-transform: uppercase; color: var(--muted);
+  font-weight: 400; padding: var(--s-5) var(--s-6);
+  border-bottom: var(--bw-hair) solid var(--border);
+}
+table.t td { padding: var(--s-6); border-bottom: var(--bw-hair) solid var(--border); color: var(--fg-2); }
+table.t tbody tr:last-child td { border-bottom: 0; }
+table.t tbody tr:hover { background: var(--surface-2); }
+table.t .n { text-align: right; font-family: var(--font-mono); color: var(--muted); }
+
+/* Where a Session is in its plan, without saying how it went. */
+.dots { display: inline-flex; gap: 3px; }
+.dots > i { width: 6px; height: 6px; border-radius: var(--r-full); background: var(--surface-3); }
+.dots > i[data-done] { background: var(--accent); }
+
+/* The hero variant: starting one is the action, history is the record. */
+.hero {
+  display: grid; gap: var(--s-7); padding: var(--s-11) var(--s-10);
+  border: var(--bw-hair) solid var(--border); border-radius: var(--r-lg);
+  background: var(--surface);
+}
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: var(--s-9); align-items: start; }
+
+/* A Session still open outranks the list: it is the only one you can act on. */
+.open-card {
+  display: grid; gap: var(--s-6); padding: var(--s-8);
+  border: var(--bw-hair) solid var(--accent-line); border-radius: var(--r-md);
+  background: color-mix(in oklch, var(--accent) 6%, var(--surface));
+}
+.day {
+  font-family: var(--font-mono); font-size: var(--t-11); letter-spacing: var(--ls-caps);
+  text-transform: uppercase; color: var(--faint);
+  padding: var(--s-7) 0 var(--s-4);
+}
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr; }
+  .rail { display: none; }
+  .hero-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---- the prototype switcher (not part of the design) --------------------- */
+.switch {
+  position: fixed; left: 50%; bottom: var(--s-7); transform: translateX(-50%); z-index: 999;
+  display: flex; align-items: center; gap: var(--s-2); padding: var(--s-3);
+  border-radius: var(--r-full); background: oklch(.98 0 0); color: oklch(.18 0 0);
+  box-shadow: 0 8px 30px rgb(0 0 0 / .5); font-family: var(--font-mono); font-size: var(--t-12);
+}
+.switch button { width: 30px; height: 30px; border-radius: var(--r-full); display: grid; place-items: center; color: oklch(.30 0 0); }
+.switch button:hover { background: oklch(.90 0 0); }
+.switch .lbl { padding: 0 var(--s-5); white-space: nowrap; font-weight: 500; }
+.switch .hint { padding-left: var(--s-5); padding-right: var(--s-5); color: oklch(.45 0 0); border-left: 1px solid oklch(.85 0 0); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div class="switch" role="group" aria-label="Prototype variant">
+  <button id="prev" aria-label="Previous variant">&lsaquo;</button>
+  <span class="lbl" id="lbl">A</span>
+  <button id="next" aria-label="Next variant">&rsaquo;</button>
+  <span class="hint">&larr; &rarr; to switch &middot; prototype only</span>
+</div>
+<script>
+
+/* ============================================================== fake data ===
+   Shaped like `core.session` plus what a listing would join: state,
+   started_at, ended_at, duration_seconds, scope_module_ids, provider,
+   ended_reason / parked_reason, the plan's budget, and how many Topics the
+   Session actually measured (an Evidence row each).
+
+   No figure here says how well it went, because there is none to say. */
+const SESSIONS = [
+  { id: "ses_9f2a71", state: "running", started: -22 * 60, ended: null,
+    duration: 3000, provider: "deepseek", modules: ["Attention", "Optimisers"],
+    budget: 8, asked: 3, measured: 0, reason: null },
+  { id: "ses_7c1188", state: "parked", started: -3 * 3600, ended: -3 * 3600 + 900,
+    duration: 1500, provider: "deepseek", modules: ["Backpropagation"],
+    budget: 5, asked: 2, measured: 0, reason: "credits_exhausted" },
+  { id: "ses_4b90de", state: "ended", started: -26 * 3600, ended: -26 * 3600 + 2820,
+    duration: 3000, provider: "deepseek", modules: ["Attention", "Transformers", "Tokenisation"],
+    budget: 10, asked: 10, measured: 9, reason: "plan_exhausted" },
+  { id: "ses_21ff05", state: "ended", started: -50 * 3600, ended: -50 * 3600 + 1500,
+    duration: 1500, provider: "deepseek", modules: ["Caching"],
+    budget: 5, asked: 4, measured: 4, reason: "duration" },
+  { id: "ses_0ac913", state: "ended", started: -9 * 86400, ended: -9 * 86400 + 640,
+    duration: 1500, provider: "deepseek", modules: ["Load balancing"],
+    budget: 5, asked: 1, measured: 1, reason: "candidate_ended" },
+];
+
+/* Why it stopped, in the Candidate's words. The three parking reasons are not
+   here: those arrive with the API's own message, and composing copy for them
+   is how a Credit message reaches somebody on their own key. */
+const ENDED = {
+  duration: "Time was up",
+  plan_exhausted: "The plan was run to the end",
+  candidate_ended: "You ended it",
+  scope_exhausted: "Every Topic in scope was visited",
+};
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+const mins = (s) => `${Math.round(s / 60)} min`;
+
+const ago = (secs) => {
+  const s = Math.abs(secs);
+  if (s < 3600) return `${Math.round(s / 60)} minutes ago`;
+  if (s < 86400) return `${Math.round(s / 3600)} hours ago`;
+  const d = Math.round(s / 86400);
+  return d === 1 ? "yesterday" : `${d} days ago`;
+};
+
+const dayOf = (secs) => {
+  const s = Math.abs(secs);
+  if (s < 86400) return "Today";
+  if (s < 2 * 86400) return "Yesterday";
+  return "Earlier";
+};
+
+/* What a Session is, without a word about how it went. */
+const scopeOf = (s) =>
+  s.modules.length <= 2 ? s.modules.join(" · ")
+    : `${s.modules.slice(0, 2).join(" · ")} +${s.modules.length - 2}`;
+
+const progress = (s) =>
+  `${s.asked} of ${s.budget} question${s.budget === 1 ? "" : "s"}`;
+
+/* A parked Session has not been graded, so it has no Topics measured and no
+   report to open. Saying "0 Topics" there would read as a result. */
+const measuredOf = (s) =>
+  s.state === "ended" ? `${s.measured} Topic${s.measured === 1 ? "" : "s"} measured`
+  : s.state === "parked" ? "not graded — it is waiting"
+  : "graded when it ends";
+
+const stateTag = (s) =>
+  s.state === "running" ? `<span class="tag" data-tone="accent">Running</span>`
+  : s.state === "parked" ? `<span class="tag" data-tone="warn">Parked</span>`
+  : `<span class="tag">Ended</span>`;
+
+/* The one thing you can do with it. A parked Session resumes; it does not
+   report, because it has nothing measured to report. */
+const actionOf = (s, cls = "btn--sm") =>
+  s.state === "running" ? `<a class="btn btn--primary ${cls}" href="#">Resume</a>`
+  : s.state === "parked" ? `<a class="btn ${cls}" href="#">Resume</a>`
+  : `<a class="btn ${cls}" href="#">Report</a>`;
+
+const dots = (s) =>
+  `<span class="dots" role="img" aria-label="${s.asked} of ${s.budget} questions asked">` +
+  Array.from({ length: s.budget }, (_, i) => `<i${i < s.asked ? ' data-done=""' : ""}></i>`).join("") +
+  `</span>`;
+
+const start = (size = "") =>
+  `<a class="btn btn--primary ${size}" href="#">Start a Session</a>`;
+
+function shell(main) {
+  return `
+  <div class="app">
+    <aside class="rail">
+      <div class="brand"><span class="brand-mark">I</span> InterviewLM</div>
+      <nav class="nav">
+        <a href="#"><span class="dot"></span>Notebook</a>
+        <a href="#" aria-current="page"><span class="dot"></span>Session</a>
+        <a href="#"><span class="dot"></span>Mastery</a>
+        <a href="#"><span class="dot"></span>Report</a>
+      </nav>
+      <div style="margin-top:auto" class="caption">
+        The tab is Session now. Examination was a screen you could only reach by
+        already being in one.
+      </div>
+    </aside>
+    <div class="main">${main}</div>
+  </div>`;
+}
+
+const openOne = SESSIONS.find((s) => s.state === "running" || s.state === "parked");
+
+/* =========================================================== VARIANT A ====
+   THE LEDGER. One row per Session, newest first, and starting one is a button
+   in the topbar like any other primary action. Reads as a record. */
+function variantA() {
+  return shell(`
+    <div class="topbar">
+      <h1 class="h3">Session</h1>
+      ${start("btn--sm")}
+    </div>
+    <div class="pad wrap stack g8">
+      <div>
+        <span class="eyebrow">Your examinations</span>
+        <h2 class="h1 mt4">Every Session you have sat.</h2>
+        <p class="caption mt5" style="max-width:62ch">
+          A Session is a plan fixed before the first question, run against a transcript,
+          and graded once at the end. There is no figure for a Session as a whole —
+          the reading is per Topic, and it is in the report.
+        </p>
+      </div>
+
+      <div class="panel">
+        ${SESSIONS.map((s) => `
+          <div class="ses" data-state="${s.state}">
+            <span class="ses-mark">${s.modules.length}</span>
+            <span>
+              <span class="ses-when">${esc(scopeOf(s))}</span>
+              <span class="ses-sub">
+                ${ago(s.started)} · ${mins(s.duration)} · ${progress(s)} · ${measuredOf(s)}
+              </span>
+            </span>
+            <span class="row g-5">
+              ${dots(s)}
+              ${stateTag(s)}
+              ${actionOf(s)}
+            </span>
+          </div>`).join("")}
+      </div>
+
+      <p class="caption">
+        A Session that is parked is waiting rather than finished, so it has not been
+        graded. Resuming carries it on.
+      </p>
+    </div>`);
+}
+
+/* =========================================================== VARIANT B ====
+   THE TABLE. Facts in columns, scanned down rather than read across, with the
+   one Session you can act on lifted out above it. For somebody who has sat
+   twenty of these and wants the one from Tuesday. */
+function variantB() {
+  const rest = SESSIONS.filter((s) => s !== openOne);
+  return shell(`
+    <div class="topbar">
+      <h1 class="h3">Session</h1>
+      <div class="row">
+        <span class="caption mono">${SESSIONS.length} sat</span>
+        ${start("btn--sm")}
+      </div>
+    </div>
+    <div class="pad wrap stack g8">
+      ${openOne ? `
+        <div class="open-card">
+          <div class="between" style="align-items:flex-start">
+            <div>
+              <span class="eyebrow">${openOne.state === "running" ? "Still open" : "Parked"}</span>
+              <h2 class="h2 mt3">${esc(scopeOf(openOne))}</h2>
+              <p class="caption mt4">
+                ${openOne.state === "running"
+                  ? `Started ${ago(openOne.started)} · ${progress(openOne)} asked. It resumes where it stopped.`
+                  : `Stopped ${ago(openOne.started)} · ${progress(openOne)} asked. It has not been graded — resuming carries it on.`}
+              </p>
+            </div>
+            ${actionOf(openOne, "")}
+          </div>
+          ${dots(openOne)}
+        </div>` : ""}
+
+      <section>
+        <div class="between" style="align-items:baseline">
+          <h2 class="h2">The record</h2>
+          <span class="caption">Newest first</span>
+        </div>
+        <div class="panel mt5" style="overflow:hidden">
+          <div class="table-scroll">
+            <table class="t">
+              <thead>
+                <tr>
+                  <th>Scope</th>
+                  <th style="width:150px">When</th>
+                  <th style="width:110px" class="n">Ran for</th>
+                  <th style="width:130px" class="n">Questions</th>
+                  <th style="width:150px" class="n">Topics measured</th>
+                  <th style="width:170px">How it ended</th>
+                  <th style="width:110px"></th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rest.map((s) => `
+                  <tr>
+                    <td style="color:var(--fg)">${esc(scopeOf(s))}</td>
+                    <td class="caption">${ago(s.started)}</td>
+                    <td class="n">${mins(s.duration)}</td>
+                    <td class="n">${s.asked} / ${s.budget}</td>
+                    <td class="n">${s.state === "ended" ? s.measured : "—"}</td>
+                    <td class="caption">
+                      ${s.state === "ended"
+                        ? esc(ENDED[s.reason] ?? s.reason)
+                        : `<span class="tag" data-tone="warn">Parked · not graded</span>`}
+                    </td>
+                    <td style="text-align:right">${actionOf(s)}</td>
+                  </tr>`).join("")}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <p class="caption mt4">
+          Topics measured is a count of Evidence rows, not a score. A Topic the Session
+          never reached has none — it is unasked, which is a different fact from
+          answered badly.
+        </p>
+      </section>
+    </div>`);
+}
+
+/* =========================================================== VARIANT C ====
+   START ONE. The primary act is sitting the next Session, so it is the screen;
+   the record is underneath, grouped by when. For somebody who comes here to
+   revise rather than to audit. */
+function variantC() {
+  let day = "";
+  return shell(`
+    <div class="topbar"><h1 class="h3">Session</h1></div>
+    <div class="pad wrap stack g9">
+      <div class="hero">
+        <div class="hero-grid">
+          <div>
+            <span class="eyebrow">Sit another</span>
+            <h2 class="display-3 mt4">Reading is not preparation.</h2>
+            <p class="prose mt6">
+              Choose the Modules you want examined on and how long you have. The plan is
+              fixed before the first question, and you can see it while you answer.
+            </p>
+            <div class="row g-5 mt8" style="flex-wrap:wrap">
+              ${start("btn--lg")}
+              ${openOne ? `<a class="btn" href="#">
+                ${openOne.state === "running" ? "Resume the open one" : "Resume the parked one"}
+              </a>` : ""}
+            </div>
+          </div>
+          <div class="stack g-6">
+            <span class="eyebrow">Last time</span>
+            ${(() => {
+              const last = SESSIONS.find((s) => s.state === "ended");
+              return last ? `
+                <div class="stack g-4">
+                  <span class="ses-when">${esc(scopeOf(last))}</span>
+                  <span class="caption">${ago(last.started)} · ${progress(last)}</span>
+                  <span class="caption">${measuredOf(last)}</span>
+                  <a class="btn btn--sm mt4" href="#">Read the report</a>
+                </div>` : `<p class="caption">Nothing yet.</p>`;
+            })()}
+          </div>
+        </div>
+      </div>
+
+      <section>
+        <div class="between" style="align-items:baseline">
+          <h2 class="h2">Sessions you have sat</h2>
+          <span class="caption mono">${SESSIONS.length}</span>
+        </div>
+        <div class="mt5">
+          ${SESSIONS.map((s) => {
+            const d = dayOf(s.started);
+            const head = d !== day ? (day = d, `<div class="day">${d}</div>`) : "";
+            return `${head}
+              <div class="panel" style="margin-bottom:var(--s-4)">
+                <div class="ses" data-state="${s.state}" style="border-bottom:0">
+                  <span class="ses-mark">${s.modules.length}</span>
+                  <span>
+                    <span class="ses-when">${esc(scopeOf(s))}</span>
+                    <span class="ses-sub">${mins(s.duration)} · ${progress(s)} · ${measuredOf(s)}</span>
+                  </span>
+                  <span class="row g-5">${stateTag(s)}${actionOf(s)}</span>
+                </div>
+              </div>`;
+          }).join("")}
+        </div>
+      </section>
+    </div>`);
+}
+
+/* --------------------------------------------------------------- render -- */
+const VARIANTS = {
+  A: { name: "Ledger — one row per Session", fn: variantA },
+  B: { name: "Table — the open one lifted out, the rest in columns", fn: variantB },
+  C: { name: "Start one — the next Session is the screen", fn: variantC },
+};
+const KEYS = Object.keys(VARIANTS);
+let variant = "A";
+
+function render() {
+  document.getElementById("root").innerHTML = VARIANTS[variant].fn();
+  document.getElementById("lbl").textContent = `${variant} — ${VARIANTS[variant].name}`;
+}
+function setVariant(k) {
+  variant = k;
+  const u = new URL(location.href);
+  u.searchParams.set("variant", k);
+  history.replaceState({}, "", u);
+  render();
+}
+const cycle = (step) => setVariant(KEYS[(KEYS.indexOf(variant) + step + KEYS.length) % KEYS.length]);
+document.getElementById("prev").onclick = () => cycle(-1);
+document.getElementById("next").onclick = () => cycle(1);
+addEventListener("keydown", (e) => {
+  const el = document.activeElement;
+  if (el && /^(INPUT|TEXTAREA)$/.test(el.tagName)) return;
+  if (e.key === "ArrowLeft") cycle(-1);
+  if (e.key === "ArrowRight") cycle(1);
+});
+
+const asked = new URL(location.href).searchParams.get("variant");
+variant = KEYS.includes(asked) ? asked : "A";
+render();
+</script>
+</body>
+</html>

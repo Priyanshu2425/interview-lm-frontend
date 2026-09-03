@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="en" data-theme="graphite">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE — the Notebook screen</title>
+<!--
+  THROWAWAY. One design, two states.
+
+    Library   a quiet list of your own notebooks, and a way to add more.
+    Notebook  opening one becomes a workbench: the documents in it on the
+              left, the document itself in the middle, and what was
+              extracted from it on the right.
+
+  Data is fake and shaped like the real tables — notebook_source (title,
+  state, progress, text), notebook_topic (title, order, dossier_tokens) and
+  notebook_chunk (page, char_start, char_end), which is what makes selecting a
+  Topic highlight the spans it was drawn from rather than merely look like it.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+
+:root{
+  --t-38:2.375rem;--t-30:1.875rem;--t-24:1.5rem;--t-20:1.25rem;--t-18:1.125rem;
+  --t-16:1rem;--t-14:.875rem;--t-13:.8125rem;--t-12:.75rem;--t-11:.6875rem;
+  --lh-tight:1.14;--lh-snug:1.32;--lh-body:1.62;--lh-loose:1.85;--ls-caps:.09em;--ls-tight:-.02em;
+  --s-1:2px;--s-2:4px;--s-3:6px;--s-4:8px;--s-5:12px;--s-6:16px;--s-7:20px;--s-8:24px;
+  --s-9:32px;--s-10:40px;--s-11:56px;--s-12:72px;--s-13:96px;
+  --r-xs:4px;--r-sm:6px;--r-md:10px;--r-lg:14px;--r-full:999px;--bw-hair:1px;--bw-thick:2px;
+  --d-1:110ms;--d-2:170ms;--d-3:260ms;--e-out:cubic-bezier(.16,1,.3,1);
+  --h-topbar:56px;--w-rail:232px;--w-panel:348px;--w-wrap:1320px;
+
+  --bg:oklch(.170 .006 265);--surface:oklch(.205 .007 265);--surface-2:oklch(.252 .009 265);
+  --surface-3:oklch(.300 .010 265);
+  --fg:oklch(.962 .003 265);--fg-2:oklch(.840 .006 265);--muted:oklch(.672 .012 265);--faint:oklch(.580 .012 265);
+  --border:oklch(.270 .009 265);--border-2:oklch(.310 .010 265);
+  --accent:oklch(.800 .150 190);--accent-hov:oklch(.865 .140 190);
+  --accent-soft:oklch(.800 .150 190/.14);--accent-line:oklch(.800 .150 190/.42);
+  --on-accent:oklch(.180 .024 190);
+  --risk:oklch(.680 .190 24);--warn:oklch(.812 .148 78);--ok:oklch(.770 .135 158);
+  --font-display:"Space Grotesk",system-ui,sans-serif;
+  --font-body:Inter,system-ui,-apple-system,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--fg-2);font-family:var(--font-body);
+  font-size:var(--t-14);line-height:var(--lh-body);
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{font-family:var(--font-display);color:var(--fg);margin:0;letter-spacing:var(--ls-tight);line-height:var(--lh-tight)}
+.h1{font-size:var(--t-30)}.h2{font-size:var(--t-24)}.h3{font-size:var(--t-20)}.h4{font-size:var(--t-18)}
+p{margin:0}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.mono{font-family:var(--font-mono);font-size:var(--t-12)}
+.eyebrow{font-family:var(--font-mono);font-size:var(--t-11);letter-spacing:var(--ls-caps);
+  text-transform:uppercase;color:var(--muted);display:block}
+.caption{font-size:var(--t-12);color:var(--muted);line-height:var(--lh-body)}
+.dim{color:var(--muted)}
+.hair-t{border-top:var(--bw-hair) solid var(--border)}
+.hair-b{border-bottom:var(--bw-hair) solid var(--border)}
+.row{display:flex;align-items:center;gap:var(--s-4)}
+.between{display:flex;align-items:center;justify-content:space-between;gap:var(--s-5)}
+.stack{display:grid}
+.g4{gap:var(--s-4)}.g5{gap:var(--s-5)}.g6{gap:var(--s-6)}.g7{gap:var(--s-7)}.g8{gap:var(--s-8)}
+.mt4{margin-top:var(--s-4)}.mt5{margin-top:var(--s-5)}.mt6{margin-top:var(--s-6)}
+.mt8{margin-top:var(--s-8)}.mt9{margin-top:var(--s-9)}
+
+/* ---- shell ------------------------------------------------------------ */
+.app{display:grid;grid-template-columns:var(--w-rail) 1fr;height:100vh;overflow:hidden}
+.rail{overflow:auto;border-right:var(--bw-hair) solid var(--border);background:var(--surface);
+  padding:var(--s-6) var(--s-5);display:flex;flex-direction:column;gap:var(--s-8)}
+.brand{display:flex;align-items:center;gap:var(--s-4);color:var(--fg);font-family:var(--font-display);
+  font-weight:600;letter-spacing:var(--ls-tight)}
+.brand-mark{width:24px;height:24px;border-radius:var(--r-xs);background:var(--accent);
+  color:var(--on-accent);display:grid;place-items:center;font-size:var(--t-13)}
+.nav{display:grid;gap:var(--s-1)}
+.nav a{display:flex;align-items:center;gap:var(--s-5);padding:var(--s-4) var(--s-5);
+  border-radius:var(--r-sm);color:var(--muted);text-decoration:none;font-size:var(--t-13)}
+.nav a:hover{background:var(--surface-2);color:var(--fg-2)}
+.nav a[aria-current]{background:var(--surface-2);color:var(--fg)}
+.nav a[aria-current] .dot{background:var(--accent)}
+.dot{width:5px;height:5px;border-radius:var(--r-full);background:var(--faint)}
+.topbar{height:var(--h-topbar);border-bottom:var(--bw-hair) solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;gap:var(--s-6);
+  padding:0 var(--s-9);position:sticky;top:0;background:color-mix(in oklch,var(--bg) 88%,transparent);
+  backdrop-filter:blur(8px);z-index:20}
+.main{min-width:0;min-height:0;display:flex;flex-direction:column;overflow:auto}
+.pad{padding:var(--s-9)}
+.wrap{max-width:var(--w-wrap);width:100%}
+
+/* ---- controls --------------------------------------------------------- */
+.btn{display:inline-flex;align-items:center;gap:var(--s-4);height:36px;padding:0 var(--s-6);
+  border-radius:var(--r-sm);border:var(--bw-hair) solid var(--border-2);color:var(--fg-2);
+  font-size:var(--t-13);transition:background var(--d-1),border-color var(--d-1),color var(--d-1)}
+.btn:hover{background:var(--surface-2);color:var(--fg)}
+.btn--primary{background:var(--accent);color:var(--on-accent);border-color:transparent;font-weight:500}
+.btn--primary:hover{background:var(--accent-hov);color:var(--on-accent)}
+.btn--sm{height:28px;padding:0 var(--s-5);font-size:var(--t-12)}
+.btn--ghost{border-color:transparent}
+.tag{display:inline-flex;align-items:center;gap:var(--s-3);height:22px;padding:0 var(--s-4);
+  border-radius:var(--r-full);border:var(--bw-hair) solid var(--border-2);
+  font-family:var(--font-mono);font-size:var(--t-11);color:var(--muted);white-space:nowrap}
+.tag[data-tone=ok]{color:var(--ok);border-color:color-mix(in oklch,var(--ok) 40%,transparent)}
+.tag[data-tone=warn]{color:var(--warn);border-color:color-mix(in oklch,var(--warn) 40%,transparent)}
+.tag[data-tone=risk]{color:var(--risk);border-color:color-mix(in oklch,var(--risk) 40%,transparent)}
+.tag[data-tone=accent]{color:var(--accent);border-color:var(--accent-line)}
+.panel{background:var(--surface);border:var(--bw-hair) solid var(--border);border-radius:var(--r-md)}
+.meter{height:3px;border-radius:var(--r-full);background:var(--surface-3);overflow:hidden}
+.meter>i{display:block;height:100%;background:var(--accent);transition:width var(--d-3) var(--e-out)}
+
+/* ---- dropzone --------------------------------------------------------- */
+.drop{border:var(--bw-hair) dashed var(--border-2);border-radius:var(--r-md);
+  padding:var(--s-9);text-align:center;color:var(--muted);background:var(--surface);
+  transition:border-color var(--d-1),background var(--d-1)}
+.drop:hover{border-color:var(--accent-line);background:var(--surface-2)}
+.drop strong{color:var(--fg);font-family:var(--font-display);font-weight:500;display:block;
+  font-size:var(--t-18);margin-bottom:var(--s-3)}
+.drop--slim{padding:var(--s-6);text-align:left;display:flex;align-items:center;
+  justify-content:space-between;gap:var(--s-6)}
+.drop--slim strong{font-size:var(--t-14);margin:0}
+
+/* ---- notebook rows / cards -------------------------------------------- */
+.nb-row{display:grid;grid-template-columns:auto 1fr auto;gap:var(--s-6);align-items:center;
+  padding:var(--s-7);text-align:left;width:100%;border-bottom:var(--bw-hair) solid var(--border);
+  transition:background var(--d-1)}
+.nb-row:last-child{border-bottom:0}
+.nb-row:hover{background:var(--surface-2)}
+.nb-row[aria-current]{background:var(--surface-2)}
+.nb-glyph{width:38px;height:38px;border-radius:var(--r-sm);background:var(--surface-2);
+  border:var(--bw-hair) solid var(--border-2);display:grid;place-items:center;
+  font-family:var(--font-mono);font-size:var(--t-11);color:var(--muted)}
+.nb-title{display:block;color:var(--fg);font-size:var(--t-16);
+  font-family:var(--font-display);font-weight:500;line-height:var(--lh-snug)}
+.nb-sub{display:block;font-size:var(--t-12);color:var(--muted);margin-top:var(--s-2)}
+.grid{display:grid;gap:var(--s-6);grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+.card{padding:var(--s-7);text-align:left;display:grid;gap:var(--s-6);align-content:start;
+  transition:border-color var(--d-1),background var(--d-1)}
+.card:hover{border-color:var(--border-2);background:var(--surface-2)}
+
+/* ---- two-pane reader --------------------------------------------------- */
+.reader{display:grid;grid-template-columns:1fr minmax(320px,var(--w-panel));
+  gap:0;border-top:var(--bw-hair) solid var(--border);min-height:0;flex:1}
+.reader--wide{grid-template-columns:1fr minmax(300px,420px)}
+.pane{min-width:0;display:flex;flex-direction:column}
+.pane+.pane{border-left:var(--bw-hair) solid var(--border)}
+.pane-head{padding:var(--s-6) var(--s-8);border-bottom:var(--bw-hair) solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;gap:var(--s-5);
+  position:sticky;top:0;background:var(--bg);z-index:5}
+.pane-body{padding:var(--s-8);overflow:auto;max-height:calc(100vh - var(--h-topbar) - 120px)}
+.doc{font-size:var(--t-14);line-height:var(--lh-loose);color:var(--fg-2);max-width:70ch}
+.doc h4{font-size:var(--t-16);margin:var(--s-8) 0 var(--s-4);color:var(--fg)}
+.doc p{margin:0 0 var(--s-6)}
+.doc .pg{font-family:var(--font-mono);font-size:var(--t-11);color:var(--faint);
+  letter-spacing:var(--ls-caps);text-transform:uppercase;display:block;margin:var(--s-9) 0 var(--s-5);
+  padding-top:var(--s-5);border-top:var(--bw-hair) solid var(--border)}
+
+/* a span the extractor drew a Topic from */
+.span{border-radius:var(--r-xs);transition:background var(--d-2),box-shadow var(--d-2)}
+.span[data-lit]{background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
+.span[data-dim]{opacity:.42}
+
+/* ---- outline ----------------------------------------------------------- */
+.mod{border-bottom:var(--bw-hair) solid var(--border);padding:var(--s-6) 0}
+.mod:first-child{padding-top:0}
+.mod:last-child{border-bottom:0}
+.mod-head{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s-5)}
+.nowrap{white-space:nowrap}
+.mod-title{color:var(--fg);font-family:var(--font-display);font-weight:500;font-size:var(--t-14)}
+.topics{list-style:none;margin:var(--s-5) 0 0;padding:0;display:grid;gap:var(--s-1)}
+.topic{display:grid;grid-template-columns:auto 1fr auto;gap:var(--s-5);align-items:baseline;
+  width:100%;text-align:left;padding:var(--s-4) var(--s-5);border-radius:var(--r-sm);
+  border-left:var(--bw-thick) solid transparent;transition:background var(--d-1),border-color var(--d-1)}
+.topic:hover{background:var(--surface-2)}
+.topic[aria-pressed=true]{background:var(--surface-2);border-left-color:var(--accent)}
+.topic-n{font-family:var(--font-mono);font-size:var(--t-11);color:var(--faint)}
+.topic-t{font-size:var(--t-13);color:var(--fg-2)}
+.topic[aria-pressed=true] .topic-t{color:var(--fg)}
+.topic-k{font-family:var(--font-mono);font-size:var(--t-11);color:var(--faint)}
+
+/* source list inside the reader */
+.srcs{display:grid;gap:var(--s-1)}
+.src{display:grid;grid-template-columns:auto 1fr auto;gap:var(--s-5);align-items:center;
+  padding:var(--s-5);border-radius:var(--r-sm);text-align:left;width:100%;
+  border-left:var(--bw-thick) solid transparent}
+.src:hover{background:var(--surface-2)}
+.src[aria-current]{background:var(--surface-2);border-left-color:var(--accent)}
+.src-t{font-size:var(--t-13);color:var(--fg-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.src[aria-current] .src-t{color:var(--fg)}
+.ext{font-family:var(--font-mono);font-size:var(--t-11);color:var(--faint);
+  border:var(--bw-hair) solid var(--border-2);border-radius:var(--r-xs);padding:1px 4px}
+
+.empty{display:grid;gap:var(--s-5);justify-items:center;text-align:center;padding:var(--s-12) var(--s-8);
+  color:var(--muted)}
+.empty strong{color:var(--fg);font-family:var(--font-display);font-size:var(--t-18);font-weight:500}
+
+/* ---- the prototype switcher (not part of the design) ------------------- */
+.switch{position:fixed;left:50%;bottom:var(--s-7);transform:translateX(-50%);z-index:999;
+  display:flex;align-items:center;gap:var(--s-2);padding:var(--s-3);border-radius:var(--r-full);
+  background:oklch(.98 0 0);color:oklch(.18 0 0);
+  box-shadow:0 8px 30px rgb(0 0 0/.5);font-family:var(--font-mono);font-size:var(--t-12)}
+.switch button{width:30px;height:30px;border-radius:var(--r-full);display:grid;place-items:center;
+  color:oklch(.30 0 0)}
+.switch button:hover{background:oklch(.90 0 0)}
+.switch .lbl{padding:0 var(--s-5);white-space:nowrap;font-weight:500}
+.switch .hint{padding-right:var(--s-5);color:oklch(.45 0 0);border-left:1px solid oklch(.85 0 0);
+  padding-left:var(--s-5)}
+@media(max-width:900px){
+  .app{grid-template-columns:1fr}.rail{display:none}
+  .reader{grid-template-columns:1fr}.pane+.pane{border-left:0;border-top:var(--bw-hair) solid var(--border)}
+}
+
+/* ---- the workbench ----------------------------------------------------- */
+.bench{display:grid;grid-template-columns:264px 1fr minmax(300px,368px);
+  border-top:var(--bw-hair) solid var(--border);flex:1;min-height:0}
+.main:has(.bench){overflow:hidden}
+.col{min-width:0;min-height:0;display:flex;flex-direction:column}
+.col+.col{border-left:var(--bw-hair) solid var(--border)}
+.col--docs{background:var(--surface)}
+.col-head{padding:var(--s-6) var(--s-7);border-bottom:var(--bw-hair) solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;gap:var(--s-5);min-height:53px}
+.col-body{padding:var(--s-7);overflow:auto;flex:1;min-height:0}
+.col--docs .col-body{padding:var(--s-5)}
+.col--doc .col-body{padding:var(--s-9) var(--s-10)}
+
+/* a document in the left column: title, state, and what came of it */
+.doc-item{display:grid;gap:var(--s-4);width:100%;text-align:left;padding:var(--s-5);
+  border-radius:var(--r-sm);border-left:var(--bw-thick) solid transparent;
+  transition:background var(--d-1),border-color var(--d-1)}
+.doc-item:hover{background:var(--surface-2)}
+.doc-item[aria-current]{background:var(--surface-2);border-left-color:var(--accent)}
+.doc-top{display:grid;grid-template-columns:auto 1fr;gap:var(--s-5);align-items:center}
+.doc-name{font-size:var(--t-13);color:var(--fg-2);overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.doc-item[aria-current] .doc-name{color:var(--fg)}
+.doc-meta{display:flex;align-items:center;gap:var(--s-4);flex-wrap:wrap;
+  font-family:var(--font-mono);font-size:var(--t-11);color:var(--faint)}
+
+/* the middle column reads like a page, not like a field */
+.reading{max-width:64ch;margin:0 auto}
+.reading h4{font-size:var(--t-18);margin:var(--s-9) 0 var(--s-5);color:var(--fg)}
+.reading p{margin:0 0 var(--s-6);font-size:var(--t-15,0.9375rem);line-height:var(--lh-loose)}
+.reading .pg{font-family:var(--font-mono);font-size:var(--t-11);color:var(--faint);
+  letter-spacing:var(--ls-caps);text-transform:uppercase;display:block;
+  margin:var(--s-10) 0 var(--s-6);padding-top:var(--s-5);
+  border-top:var(--bw-hair) solid var(--border)}
+.reading .pg:first-child{margin-top:0;padding-top:0;border-top:0}
+.reading .span{display:block;padding:var(--s-4) var(--s-5);margin-left:calc(-1 * var(--s-5));
+  border-radius:var(--r-xs);border-left:var(--bw-thick) solid transparent;
+  transition:background var(--d-2),border-color var(--d-2),opacity var(--d-2)}
+.reading .span[data-lit]{background:var(--accent-soft);border-left-color:var(--accent)}
+.reading .span[data-dim]{opacity:.38}
+
+.bar{display:flex;align-items:center;justify-content:space-between;gap:var(--s-5);
+  padding:var(--s-5) var(--s-6);border-radius:var(--r-sm);background:var(--surface-2);
+  border:var(--bw-hair) solid var(--border-2)}
+@media(max-width:1100px){
+  .bench{grid-template-columns:220px 1fr}
+  .col--out{grid-column:1 / -1;border-left:0;border-top:var(--bw-hair) solid var(--border)}
+}
+@media(max-width:900px){
+  .app{grid-template-columns:1fr}.rail{display:none}
+  .app{height:auto;overflow:visible}
+  .main:has(.bench){overflow:visible}
+  .bench{grid-template-columns:1fr}
+  .col+.col{border-left:0;border-top:var(--bw-hair) solid var(--border)}
+}
+.proto{position:fixed;right:var(--s-6);bottom:var(--s-6);z-index:99;
+  font-family:var(--font-mono);font-size:var(--t-11);letter-spacing:var(--ls-caps);
+  text-transform:uppercase;color:oklch(.18 0 0);background:oklch(.98 0 0);
+  padding:var(--s-3) var(--s-5);border-radius:var(--r-full);box-shadow:0 6px 24px rgb(0 0 0/.45)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<span class="proto">Prototype</span>
+<script>
+const NOTEBOOKS = [
+  {
+    id: "nb_7f21", title: "Deep Learning Specialisation — my notes",
+    added: "3 days ago", visibility: "personal",
+    sources: [
+      {
+        id: "src_a1", title: "week-03-backprop.pdf", ext: "PDF", state: "ready",
+        bytes: "1.4 MB", pages: 12, module_id: "nb-mod-311",
+        topics: [
+          { id: "t1", n: 1, title: "The chain rule through a layer", tokens: 1840 },
+          { id: "t2", n: 2, title: "Gradient descent and the update rule", tokens: 2210 },
+          { id: "t3", n: 3, title: "Vanishing and exploding gradients", tokens: 1360 },
+        ],
+        body: [
+          { p: 1, t: "t1", h: "Backpropagation", x: "Training a network means adjusting every weight in the direction that reduces the loss. Backpropagation is how the gradient of the loss with respect to each weight is obtained without recomputing the whole forward pass for every parameter." },
+          { p: 1, t: "t1", x: "The method is the chain rule applied layer by layer, from the output backwards. Each layer receives the derivative of the loss with respect to its own output, and passes back the derivative with respect to its input." },
+          { p: 2, t: "t2", h: "The update", x: "Once the gradient is known, the weights move against it by a small step. That step size is the learning rate, and it is the single hyperparameter most likely to make training diverge when it is set carelessly." },
+          { p: 2, t: "t2", x: "Stochastic gradient descent estimates the gradient from a minibatch rather than the whole dataset. The estimate is noisy, and the noise is useful: it lets the optimiser leave sharp minima that a full-batch estimate would settle into." },
+          { p: 3, t: "t3", h: "When gradients misbehave", x: "In a deep stack the chain rule multiplies many terms together. If those terms are consistently below one the gradient shrinks toward zero before it reaches the early layers; if consistently above one it grows without bound." },
+          { p: 3, t: "t3", x: "Normalisation layers, residual connections and careful initialisation all address the same underlying problem: keeping the magnitude of the signal roughly constant as it passes through depth." },
+        ],
+      },
+      {
+        id: "src_a2", title: "week-04-attention.md", ext: "MD", state: "ready",
+        bytes: "62 KB", pages: 6, module_id: "nb-mod-312",
+        topics: [
+          { id: "t4", n: 1, title: "Scaled dot-product attention", tokens: 2040 },
+          { id: "t5", n: 2, title: "Why the scaling factor exists", tokens: 980 },
+          { id: "t6", n: 3, title: "Multi-head attention", tokens: 1610 },
+        ],
+        body: [
+          { p: 1, t: "t4", h: "Attention", x: "Attention computes a weighted average of value vectors, where the weights come from the similarity between a query and each key. Nothing about the operation is sequential, which is what lets a transformer process a whole sequence at once." },
+          { p: 1, t: "t4", x: "The similarity is a dot product, turned into weights by a softmax over the key positions." },
+          { p: 2, t: "t5", h: "The scaling factor", x: "Dot products grow with dimension. For large key dimensions the products land far from zero, the softmax saturates, and the gradient through it becomes vanishingly small." },
+          { p: 2, t: "t5", x: "Dividing by the square root of the key dimension keeps the products in a region where the softmax still has gradient. It is a variance argument, not a heuristic." },
+          { p: 3, t: "t6", h: "Several heads", x: "One attention operation can only express one notion of relevance. Multi-head attention runs several in parallel on projected subspaces and concatenates the results, so different heads can attend to different relationships." },
+        ],
+      },
+      {
+        id: "src_a3", title: "lecture-recording-05.mp4", ext: "MP4", state: "stub",
+        bytes: "220 MB", pages: 0, module_id: "—",
+        stub_reason: "no extractable text — a recording is not examinable on its own",
+        topics: [], body: [],
+      },
+      {
+        id: "src_a4", title: "week-05-optimisers.pdf", ext: "PDF", state: "ingesting",
+        bytes: "2.1 MB", pages: 18, module_id: "nb-mod-313",
+        done: 14, total: 40, topics: [], body: [],
+      },
+    ],
+  },
+  {
+    id: "nb_c904", title: "System design interview prep", added: "last week", visibility: "personal",
+    sources: [
+      {
+        id: "src_b1", title: "caching-strategies.md", ext: "MD", state: "ready",
+        bytes: "38 KB", pages: 4, module_id: "nb-mod-401",
+        topics: [
+          { id: "t7", n: 1, title: "Read-through and write-through", tokens: 1450 },
+          { id: "t8", n: 2, title: "Invalidation and staleness", tokens: 1720 },
+        ],
+        body: [
+          { p: 1, t: "t7", h: "Where the cache sits", x: "A read-through cache is consulted first and populates itself on a miss. A write-through cache is updated on every write, so a read after a write cannot see a stale value — at the cost of writing twice." },
+          { p: 1, t: "t7", x: "The choice is about which failure you would rather have: a slow first read, or a slow every-write." },
+          { p: 2, t: "t8", h: "Invalidation", x: "There are only two hard problems, and this is one of them. A cache with no invalidation strategy is a correctness bug with good latency." },
+          { p: 2, t: "t8", x: "Time-to-live is the cheapest strategy and the least precise: it bounds how stale a value can be without knowing whether it is stale at all." },
+        ],
+      },
+      {
+        id: "src_b2", title: "load-balancing.pdf", ext: "PDF", state: "failed",
+        bytes: "900 KB", pages: 9, module_id: "nb-mod-402",
+        stub_reason: "the embedder stopped answering partway through",
+        topics: [], body: [],
+      },
+    ],
+  },
+  {
+    id: "nb_2b7e", title: "Papers I keep meaning to read", added: "a month ago", visibility: "personal",
+    sources: [
+      {
+        id: "src_c1", title: "attention-is-all-you-need.pdf", ext: "PDF", state: "ready",
+        bytes: "2.2 MB", pages: 15, module_id: "nb-mod-501",
+        topics: [
+          { id: "t9", n: 1, title: "Encoder–decoder structure", tokens: 2600 },
+          { id: "t10", n: 2, title: "Positional encoding", tokens: 1180 },
+        ],
+        body: [
+          { p: 1, t: "t9", h: "Architecture", x: "The transformer keeps the encoder–decoder shape of earlier sequence models and removes the recurrence entirely, replacing it with stacked self-attention and position-wise feed-forward layers." },
+          { p: 2, t: "t10", h: "Position", x: "With no recurrence and no convolution, nothing in the model knows the order of the sequence. Positional encodings are added to the input embeddings so that order is recoverable." },
+        ],
+      },
+    ],
+  },
+];
+
+const STATE = {
+  ready:     { label: "Ready",    tone: "ok"     },
+  ingesting: { label: "Reading",  tone: "accent" },
+  uploaded:  { label: "Waiting",  tone: "accent" },
+  failed:    { label: "Failed",   tone: "risk"   },
+  stub:      { label: "Unusable", tone: "warn"   },
+};
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+const ready = (nb) => nb.sources.filter((s) => s.state === "ready");
+const topicCount = (nb) => ready(nb).reduce((n, s) => n + s.topics.length, 0);
+const moduleCount = (nb) => new Set(ready(nb).map((s) => s.module_id)).size;
+const busy = (nb) => nb.sources.some((s) => s.state === "ingesting" || s.state === "uploaded");
+const problem = (nb) => nb.sources.filter((s) => s.state === "failed" || s.state === "stub").length;
+const tag = (state) => `<span class="tag" data-tone="${STATE[state].tone}">${STATE[state].label}</span>`;
+
+const nbLine = (nb) => {
+  const bits = [`${nb.sources.length} document${nb.sources.length === 1 ? "" : "s"}`];
+  if (moduleCount(nb)) bits.push(`${moduleCount(nb)} module${moduleCount(nb) === 1 ? "" : "s"}`);
+  if (topicCount(nb)) bits.push(`${topicCount(nb)} topics`);
+  return bits.join(" · ");
+};
+
+let ui = { nb: null, src: null, topic: null };
+const currentNb = () => NOTEBOOKS.find((n) => n.id === ui.nb) ?? null;
+const currentSrc = () => currentNb()?.sources.find((s) => s.id === ui.src) ?? null;
+
+function openNotebook(id) {
+  const nb = NOTEBOOKS.find((n) => n.id === id);
+  ui.nb = id;
+  /* Open on something worth reading. A notebook whose first document is a
+     recording should not open on an empty pane. */
+  ui.src = (ready(nb)[0] ?? nb.sources[0])?.id ?? null;
+  ui.topic = null;
+  render();
+}
+function selectSource(id) { ui.src = id; ui.topic = null; render(); }
+function closeNotebook() { ui = { nb: null, src: null, topic: null }; render(); }
+function toggleTopic(id) {
+  ui.topic = ui.topic === id ? null : id;
+  render();
+  /* Bring the first span into view: selecting a Topic three pages down should
+     not require hunting for the highlight. */
+  if (ui.topic) {
+    const first = document.querySelector('.reading .span[data-lit]');
+    if (first) first.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+}
+
+/* ------------------------------------------------------------- the shell -- */
+function shell(main) {
+  return `
+  <div class="app">
+    <aside class="rail">
+      <div class="brand"><span class="brand-mark">I</span> InterviewLM</div>
+      <nav class="nav">
+        <a href="#" aria-current="page"><span class="dot"></span>Notebook</a>
+        <a href="#"><span class="dot"></span>Session</a>
+        <a href="#"><span class="dot"></span>Examination</a>
+        <a href="#"><span class="dot"></span>Mastery</a>
+        <a href="#"><span class="dot"></span>Report</a>
+      </nav>
+      <div style="margin-top:auto" class="caption">
+        Your documents only. Shared Skills are chosen when you set up a Session.
+      </div>
+    </aside>
+    <div class="main">${main}</div>
+  </div>`;
+}
+
+/* ============================================================== LIBRARY ===
+   A quiet list. One row per notebook, and the only two things worth saying
+   about one from the outside: how much is in it, and whether anything in it
+   needs attention. */
+function library() {
+  return shell(`
+    <div class="topbar">
+      <h1 class="h3">Notebook</h1>
+      <!-- A document belongs to a notebook, so this screen makes notebooks and
+           the workbench fills them. There is no upload here at all. -->
+      <button class="btn btn--primary btn--sm">New notebook</button>
+    </div>
+    <div class="pad wrap stack g8">
+      <div>
+        <span class="eyebrow">Your material</span>
+        <h2 class="h1 mt4">Everything you have brought.</h2>
+        <p class="caption mt5" style="max-width:62ch">
+          Documents you upload are read into Modules and Topics, and those are what a
+          Session can examine you on. Nothing here is shared, and nothing here is
+          anybody else's.
+        </p>
+      </div>
+
+      <div class="panel">
+        ${NOTEBOOKS.map((n) => `
+          <button class="nb-row" onclick="openNotebook('${n.id}')">
+            <span class="nb-glyph">${n.sources.length}</span>
+            <span>
+              <span class="nb-title">${esc(n.title)}</span>
+              <span class="nb-sub">${nbLine(n)} · added ${n.added}</span>
+            </span>
+            <span class="row">
+              ${busy(n) ? `<span class="tag" data-tone="accent">Reading</span>` : ""}
+              ${problem(n) ? `<span class="tag" data-tone="warn">${problem(n)} need attention</span>` : ""}
+              <span class="caption mono">open ›</span>
+            </span>
+          </button>`).join("")}
+      </div>
+
+      <p class="caption">
+        A notebook is a folder of your own material. Deleting one removes its Topics from
+        every future Session — the Evidence they produced stays on your record.
+      </p>
+    </div>`);
+}
+
+/* ============================================================ WORKBENCH ===
+   Three columns: what is in this notebook, the document itself, and what was
+   pulled out of it. Nothing here navigates away — choosing another document
+   swaps the middle and the right together, because they are two views of one
+   thing and showing one without the other is how they drift apart. */
+
+function docsColumn(nb) {
+  return `
+    <div class="col col--docs">
+      <div class="col-head">
+        <span class="eyebrow">In this notebook</span>
+        <span class="caption mono">${nb.sources.length}</span>
+      </div>
+      <div class="col-body">
+        <div class="stack g4">
+          ${nb.sources.map((s) => {
+            const meta = s.state === "ready"
+              ? `<span>${s.topics.length} topics</span><span>${s.pages} pages</span><span>${s.bytes}</span>`
+              : s.state === "ingesting"
+                ? `<span>${s.done} of ${s.total} sections</span>`
+                : `<span>${esc(s.stub_reason ?? "")}</span>`;
+            return `
+            <button class="doc-item" ${ui.src === s.id ? 'aria-current="true"' : ""}
+                    onclick="selectSource('${s.id}')">
+              <span class="doc-top">
+                <span class="ext">${s.ext}</span>
+                <span class="doc-name">${esc(s.title)}</span>
+              </span>
+              <span class="doc-meta">${tag(s.state)}${meta}</span>
+              ${s.state === "ingesting"
+                ? `<span class="meter"><i style="width:${Math.round(100 * s.done / s.total)}%"></i></span>`
+                : ""}
+            </button>`;
+          }).join("")}
+        </div>
+      </div>
+    </div>`;
+}
+
+function docColumn(src) {
+  if (!src) {
+    return `<div class="col col--doc">
+      <div class="col-head"><span class="eyebrow">Document</span></div>
+      <div class="col-body"><div class="empty"><strong>Nothing chosen</strong></div></div>
+    </div>`;
+  }
+  if (src.state !== "ready") {
+    const why = src.state === "ingesting"
+      ? `This document is being read now — ${src.done} of ${src.total} sections. It stays here while it is read, and becomes examinable when it finishes.`
+      : esc(src.stub_reason ?? "");
+    return `
+      <div class="col col--doc">
+        <div class="col-head">
+          <div class="row"><span class="ext">${src.ext}</span>
+            <span style="color:var(--fg)">${esc(src.title)}</span></div>
+          ${tag(src.state)}
+        </div>
+        <div class="col-body">
+          <div class="empty">
+            <strong>${src.state === "ingesting" ? "Being read" : "No text to show"}</strong>
+            <p class="caption" style="max-width:46ch">${why}</p>
+            ${src.state === "ingesting"
+              ? `<span class="meter" style="width:220px"><i style="width:${Math.round(100 * src.done / src.total)}%"></i></span>`
+              : ""}
+            ${src.state === "failed" ? `<button class="btn btn--sm">Try reading it again</button>` : ""}
+            ${src.state === "stub"
+              ? `<p class="caption" style="max-width:46ch">It is kept and listed rather than hidden — a document that vanished would look like one that never arrived.</p>`
+              : ""}
+          </div>
+        </div>
+      </div>`;
+  }
+  let page = 0;
+  const body = src.body.map((b) => {
+    const brk = b.p !== page ? (page = b.p, `<span class="pg">page ${b.p}</span>`) : "";
+    const state = ui.topic ? (b.t === ui.topic ? ' data-lit=""' : ' data-dim=""') : "";
+    return `${brk}${b.h ? `<h4>${esc(b.h)}</h4>` : ""}<p class="span"${state}>${esc(b.x)}</p>`;
+  }).join("");
+  return `
+    <div class="col col--doc">
+      <div class="col-head">
+        <div class="row"><span class="ext">${src.ext}</span>
+          <span style="color:var(--fg)">${esc(src.title)}</span></div>
+        <span class="caption mono">${src.pages} pages · ${src.bytes}</span>
+      </div>
+      <div class="col-body">
+        <div class="reading">${body}</div>
+      </div>
+    </div>`;
+}
+
+function outColumn(src) {
+  if (!src || src.state !== "ready") {
+    return `
+      <div class="col col--out">
+        <div class="col-head"><span class="eyebrow">What was extracted</span></div>
+        <div class="col-body"><div class="empty">
+          <strong>Nothing extracted</strong>
+          <p class="caption" style="max-width:40ch">
+            A document becomes examinable once it has been read into Topics. Until then it
+            is kept, and listed, and nothing more.
+          </p>
+        </div></div>
+      </div>`;
+  }
+  const selected = src.topics.find((t) => t.id === ui.topic);
+  return `
+    <div class="col col--out">
+      <div class="col-head">
+        <span class="eyebrow">What was extracted</span>
+        <span class="caption mono">${src.topics.length} topics</span>
+      </div>
+      <div class="col-body">
+        <div class="mod">
+          <!-- No module name. A notebook Module is titled with its Source's own
+               filename (corpus_view.py), so a second title here would either
+               repeat the document's name back at you or invent one the data
+               does not have. The id is what the picker will show. -->
+          <div class="mod-head">
+            <span class="mod-title">The Module</span>
+            <span class="caption mono nowrap">${esc(src.module_id)}</span>
+          </div>
+          <p class="caption mt4">
+            One Module, drawn from this document. Choosing it as a Session's scope
+            examines the Topics below.
+          </p>
+          <ul class="topics">
+            ${src.topics.map((t) => `
+              <li><button class="topic" aria-pressed="${ui.topic === t.id}"
+                          onclick="toggleTopic('${t.id}')">
+                <span class="topic-n">${String(t.n).padStart(2, "0")}</span>
+                <span class="topic-t">${esc(t.title)}</span>
+                <span class="topic-k">${t.tokens.toLocaleString()} tok</span>
+              </button></li>`).join("")}
+          </ul>
+        </div>
+
+        ${selected ? `
+          <div class="bar mt6">
+            <span class="caption">Showing where <strong style="color:var(--fg)">${esc(selected.title)}</strong> came from</span>
+            <button class="btn btn--sm btn--ghost" onclick="toggleTopic('${selected.id}')">Show all</button>
+          </div>` : `
+          <p class="caption mt6">
+            Select a Topic to highlight the spans of this document it was drawn from.
+          </p>`}
+
+        <p class="caption mt6 hair-t" style="padding-top:var(--s-5)">
+          Topics are cut once, when the document is read, and then frozen — so the Evidence
+          from a Session still points at the same material a month later.
+        </p>
+      </div>
+    </div>`;
+}
+
+function workbench() {
+  const nb = currentNb();
+  const src = currentSrc();
+  return shell(`
+    <div class="topbar">
+      <div class="row">
+        <button class="btn btn--ghost btn--sm" onclick="closeNotebook()">‹ All notebooks</button>
+        <span style="color:var(--fg);font-family:var(--font-display);font-weight:500">${esc(nb.title)}</span>
+        <span class="caption mono">${nbLine(nb)}</span>
+      </div>
+      <!-- Adding documents is the only thing you come here to do that is not
+           reading, so it is the primary action. Whether something is being read
+           is already said on the document's own row in the left column, and
+           saying it twice turns the topbar into a status bar. -->
+      <button class="btn btn--primary">Add documents</button>
+    </div>
+    <div class="bench">
+      ${docsColumn(nb)}
+      ${docColumn(src)}
+      ${outColumn(src)}
+    </div>`);
+}
+
+function render() {
+  document.getElementById("root").innerHTML = ui.nb ? workbench() : library();
+}
+render();
+</script>
+</body>
+</html>
