@@ -175,20 +175,48 @@ See [CODE_PRACTICES.md](./CODE_PRACTICES.md) for comprehensive coding guidelines
 ## Checks
 
 `verify` is self-contained. Everything below it drives a real browser against a
-real API, so start the backend first — the tools say so and name the command
-rather than failing from inside Playwright.
+real API **and signs in**, so it needs three things running or set — the tools
+say which, in one line, rather than failing from inside Playwright.
 
 ```bash
 npm run verify      # typecheck · lint · unit tests · build — no server needed
 
-# from the project root, in another terminal:
-#   INTERVIEWER_FAKE_MODEL=1 .venv/bin/uvicorn interviewer.api.app:app --port 8000
+# 1. the API, from the project root:
+#      .venv/bin/uvicorn interviewer.app:app --port 8000 --env-file backend/.env
+# 2. the surface, from here:
+#      npm run dev
+# 3. the account these tools sign in as:
+export ILM_TEST_EMAIL=…
+export ILM_TEST_PASSWORD=…
 
 npm run test:e2e    # 41 checks, real browser, real API
 npm run audit       # contrast, targets, names — 5 variations × 8 routes
 ```
 
-`BASE=http://host:port` points any of them at a different deployment.
+**Two origins, and they are not interchangeable.** `BASE` is the API
+(`http://127.0.0.1:8000`); `SURFACE` is where the pages are
+(`https://interview-lm.dev.buildspacelabs.com:5173`). They were one origin
+until ADR-0020, when the API stopped serving `dist/` — a tool pointed at the
+API now gets a JSON 404 where it expected a screen. The surface host is not
+`localhost` on purpose: Gatehouse's refresh cookie is `Secure` and
+`SameSite=Lax`, so it is only sent from an https origin that is same-site with
+the auth host. `backend/scripts/dev-auth-setup.sh` sets that up, once per
+machine.
+
+**The account is a real Gatehouse member.** Identity is Gatehouse's (ADR-0026)
+and there is no bypass — an env-gated header that skipped authentication would
+be a bypass shipped in the production image. An operator creates it once:
+
+```bash
+curl -s -X POST https://auth.buildspacelabs.com/auth/register \
+  -H 'Content-Type: application/json' -H 'X-App-Slug: interview-lm' \
+  -d '{"email":"ci@example.com","password":"a long enough one"}'
+```
+
+A member cannot be deleted (Gatehouse ADR-0003), only disabled — so this is an
+account made deliberately, once, and not one a tool invents per run. It also
+needs Credits; the tools grant them to themselves, against the candidate id
+they read back from `/v1/candidates/me` rather than one they made up.
 
 `npm run audit` measures rather than asserts: it computes every rendered text
 node's contrast against its real backdrop, checks every target's box on both a

@@ -12,11 +12,11 @@
      BASE=http://127.0.0.1:8100 node tools/fidelity.mjs */
 
 import { chromium } from "playwright";
+import { BASE, SURFACE, CONTEXT, requireApi, requireSurface } from "./preflight.mjs";
+import { accessToken, candidateId, signInPage } from "./session.mjs";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 
-const BASE = process.env.BASE || "http://127.0.0.1:8000";
-const CID = "cand_fid_" + Math.random().toString(36).slice(2, 8);
 const WIDTHS = [390, 768, 1440];
 const PROTO = (name) =>
   pathToFileURL(resolve("../design-system/screens/" + name)).href;
@@ -24,7 +24,12 @@ const PROTO = (name) =>
 const api = async (path, init = {}) => {
   const r = await fetch(BASE + "/v1" + path, {
     ...init,
-    headers: { "content-type": "application/json", ...(init.headers || {}) },
+    headers: {
+      "content-type": "application/json",
+      /* Identity is Gatehouse's (ADR-0026); the API refuses anything else. */
+      authorization: `Bearer ${TOKEN}`,
+      ...(init.headers || {}),
+    },
     body: init.body ? JSON.stringify(init.body) : undefined,
   });
   return r.json();
@@ -65,6 +70,12 @@ const SCREENS = [
    stays. */
 const FUTURE = ["06-code-visit.html"];
 
+await requireApi();
+await requireSurface();
+
+const TOKEN = await accessToken();
+const CID = await candidateId(TOKEN, BASE);
+
 const browser = await chromium.launch();
 let findings = 0;
 
@@ -100,20 +111,23 @@ SCREENS[3].route = `/report/${started.session_id}`;
 
 for (const width of WIDTHS) {
   console.log(`\n── ${width}px ──────────────────────────────────────────────`);
-  const ctx = await browser.newContext({ viewport: { width, height: 900 } });
+  const ctx = await browser.newContext({ ...CONTEXT,  viewport: { width, height: 900 } });
   const p = await ctx.newPage();
-  await p.goto(BASE + "/mastery", { waitUntil: "domcontentloaded" });
-  await p.evaluate((cid) => {
-    localStorage.setItem("ilm.candidate.v1", cid);
+  /* One sign-in per context, because each width gets a fresh one and a
+     session does not cross between them. The operator token is unrelated to a
+     Candidate's session — it is the console's shared secret — so it is still
+     seeded rather than signed in for. */
+  await signInPage(p, SURFACE);
+  await p.evaluate(() => {
     sessionStorage.setItem("ilm.operator.v1", "dev-operator-token");
-  }, CID);
+  });
 
   for (const screen of SCREENS) {
     await p.goto(PROTO(screen.proto), { waitUntil: "domcontentloaded" });
     await p.waitForTimeout(200);
     const drawn = await p.evaluate(INVENTORY);
 
-    await p.goto(BASE + screen.route, { waitUntil: "networkidle" });
+    await p.goto(SURFACE + screen.route, { waitUntil: "networkidle" });
     await p.waitForTimeout(500);
     const built = await p.evaluate(INVENTORY);
 
@@ -150,10 +164,10 @@ for (const width of WIDTHS) {
 
 /* The one that must stay unbuilt. */
 {
-  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const ctx = await browser.newContext({ ...CONTEXT,  viewport: { width: 1440, height: 900 } });
   const p = await ctx.newPage();
   for (const route of ["/session/new", "/credits", "/mastery", "/settings"]) {
-    await p.goto(BASE + route, { waitUntil: "networkidle" });
+    await p.goto(SURFACE + route, { waitUntil: "networkidle" });
     const text = await p.evaluate(() => document.body.innerText.toLowerCase());
     /* A record of what we refused to build, not a lint. Each word here is a
        surface somebody could add by momentum, and the check exists so adding

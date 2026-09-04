@@ -7,9 +7,9 @@
 
    BASE=http://127.0.0.1:8000 node tests/run.mjs */
 import { chromium } from "playwright";
-import { requireApi, requireSurface } from "../tools/preflight.mjs";
+import { BASE, SURFACE, CONTEXT, requireApi, requireSurface } from "../tools/preflight.mjs";
+import { accessToken, candidateId, signInPage } from "../tools/session.mjs";
 
-const BASE = process.env.BASE || "http://127.0.0.1:8000";
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = "") => {
   if (cond) { pass++; console.log(`  ✓ ${name}`); }
@@ -19,7 +19,12 @@ const ok = (name, cond, extra = "") => {
 const api = async (path, init = {}) => {
   const r = await fetch(BASE + "/v1" + path, {
     method: init.method || "GET",
-    headers: { "content-type": "application/json", ...(init.headers || {}) },
+    headers: {
+      "content-type": "application/json",
+      /* Identity is Gatehouse's (ADR-0026); the API refuses anything else. */
+      authorization: `Bearer ${TOKEN}`,
+      ...(init.headers || {}),
+    },
     body: init.body ? JSON.stringify(init.body) : undefined,
   });
   const t = await r.text();
@@ -27,13 +32,15 @@ const api = async (path, init = {}) => {
   return t ? JSON.parse(t) : null;
 };
 
-const CID = "cand_e2e_" + Math.random().toString(36).slice(2, 8);
 
-await requireApi(BASE);
-await requireSurface(BASE);
+await requireApi();
+await requireSurface();
+
+const TOKEN = await accessToken();
+const CID = await candidateId(TOKEN, BASE);
 
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+const ctx = await browser.newContext({ ...CONTEXT,  viewport: { width: 1440, height: 900 } });
 const p = await ctx.newPage();
 const errors = [];
 p.on("pageerror", (e) => errors.push(e.message));
@@ -42,19 +49,25 @@ p.on("console", (m) => {
   if (m.type() === "error" && !/Failed to load resource/.test(t)) errors.push("console: " + t);
 });
 
+/* Signed in once; `extra` is whatever preference a check wants set alongside.
+   This used to write a candidate id into localStorage and be believed, which
+   is what ADR-0026 ended. */
+let signedIn = false;
 const seed = async (extra = {}) => {
-  await p.goto(BASE + "/mastery", { waitUntil: "domcontentloaded" });
-  await p.evaluate(({ cid, extra }) => {
-    localStorage.setItem("ilm.candidate.v1", cid);
+  if (!signedIn) {
+    await signInPage(p, SURFACE);
+    signedIn = true;
+  }
+  await p.evaluate((extra) => {
     for (const [k, v] of Object.entries(extra)) localStorage.setItem(k, v);
-  }, { cid: CID, extra });
+  }, extra);
 };
 
 /* ---------------------------------------------------------------- setup -- */
 console.log("\nSession setup");
 await api("/credits/grants", { method: "POST", body: { candidate_id: CID, credits: 90000, payment_ref: "e2e-" + CID } });
 await seed();
-await p.goto(BASE + "/session/new", { waitUntil: "networkidle" });
+await p.goto(SURFACE + "/session/new", { waitUntil: "networkidle" });
 await p.waitForTimeout(500);
 
 const apiModules = await api(`/skills/modules?track=aiml`);
@@ -163,11 +176,11 @@ ok("three identical turns produce at most one new Visit",
 
 /* ---------------------------------------------------------------- report -- */
 console.log("\nThe Session report");
-await p.goto(`${BASE}/report/${sid}`, { waitUntil: "networkidle" });
+await p.goto(`${SURFACE}/report/${sid}`, { waitUntil: "networkidle" });
 await p.waitForTimeout(900);
 ok("the old address still answers",
    await (async () => {
-     await p.goto(`${BASE}/evidence/${sid}`, { waitUntil: "networkidle" });
+     await p.goto(`${SURFACE}/evidence/${sid}`, { waitUntil: "networkidle" });
      await p.waitForTimeout(500);
      return p.url().includes("/report/");
    })());
@@ -216,7 +229,7 @@ ok("opening a row shows the span that grounded it",
 
 /* --------------------------------------------------------------- mastery -- */
 console.log("\nThe Mastery map");
-await p.goto(BASE + "/mastery", { waitUntil: "networkidle" });
+await p.goto(SURFACE + "/mastery", { waitUntil: "networkidle" });
 await p.waitForTimeout(800);
 ok("Coverage and Mastery are reported as separate readings",
    await p.evaluate(() => {
@@ -236,14 +249,14 @@ ok("no untested Topic carries a number",
 
 /* --------------------------------------------------------------- credits -- */
 console.log("\nCredits and BYOK");
-await p.goto(BASE + "/credits", { waitUntil: "networkidle" });
+await p.goto(SURFACE + "/credits", { waitUntil: "networkidle" });
 await p.waitForTimeout(700);
 ok("the balance is shown in Credits and in dollars",
    await p.evaluate(() => /\d[\d,]* Cr/.test(document.body.innerText) && /\$\d/.test(document.body.innerText)));
 ok("the ledger names each entry in the Candidate's terms",
    await p.evaluate(() => /Metered call|Payment cleared/.test(document.body.innerText)));
 
-const byok = await api("/candidates/me/byok", { method: "POST", body: { candidate_id: CID, openrouter_key: "sk-or-v1-" + "a".repeat(40) } })
+const byok = await api("/candidates/me/byok", { method: "POST", body: { openrouter_key: "sk-or-v1-" + "a".repeat(40) } })
   .catch((e) => ({ error: String(e.message) }));
 if (!byok.error) {
   await p.reload({ waitUntil: "networkidle" });
@@ -271,7 +284,7 @@ if (!byok.error) {
 
 /* -------------------------------------------------------------- keyboard -- */
 console.log("\nKeyboard");
-await p.goto(BASE + "/settings", { waitUntil: "networkidle" });
+await p.goto(SURFACE + "/settings", { waitUntil: "networkidle" });
 await p.waitForTimeout(500);
 await p.keyboard.press("Tab");
 ok("the first stop is the skip link",
@@ -285,7 +298,7 @@ ok("focus is visibly ringed",
 
 /* ----------------------------------------------------------------- session -- */
 console.log("\nThe Session list");
-await p.goto(BASE + "/session", { waitUntil: "networkidle" });
+await p.goto(SURFACE + "/session", { waitUntil: "networkidle" });
 await p.waitForTimeout(700);
 ok("the tab lists Sessions and offers to start one",
    await p.evaluate(() => /Start a Session/.test(document.body.innerText)));
@@ -303,14 +316,14 @@ ok("no Session carries a score or a percentage",
 /* The two screens this replaced. Both were reachable and both are now a row
    on this one, so their addresses lead here rather than nowhere. */
 for (const retired of ["/examination", "/report", "/evidence"]) {
-  await p.goto(BASE + retired, { waitUntil: "networkidle" });
+  await p.goto(SURFACE + retired, { waitUntil: "networkidle" });
   await p.waitForTimeout(400);
   ok(`${retired} leads to the Session list`, p.url().endsWith("/session"));
 }
 
 /* ---------------------------------------------------------------- notebook -- */
 console.log("\nThe Notebook");
-await p.goto(BASE + "/notebook", { waitUntil: "networkidle" });
+await p.goto(SURFACE + "/notebook", { waitUntil: "networkidle" });
 await p.waitForTimeout(600);
 
 /* Your own material, and nothing else. Adding a document happens inside a
@@ -345,7 +358,7 @@ if (nbid) {
      !(await p.evaluate(() => /\d\.\d\d/.test(
        document.querySelector(".bench")?.innerText || ""))));
 }
-await p.goto(`${BASE}/examination/${sid}`, { waitUntil: "networkidle" });
+await p.goto(`${SURFACE}/examination/${sid}`, { waitUntil: "networkidle" });
 await p.waitForTimeout(900);
 const endBtn = p.getByRole("button", { name: /^End Session$/ });
 if (await endBtn.count()) {
@@ -367,7 +380,7 @@ if (await endBtn.count()) {
    because a pass that only checks the destination cannot say which leg broke. */
 console.log("\nA Session by keyboard alone");
 await seed();
-await p.goto(BASE + "/session/new", { waitUntil: "networkidle" });
+await p.goto(SURFACE + "/session/new", { waitUntil: "networkidle" });
 await p.waitForTimeout(600);
 
 const tabTo = async (match, limit = 90) => {
@@ -431,7 +444,7 @@ if (/\/examination\//.test(p.url())) {
   }
 }
 
-await p.goto(`${BASE}/report/${sid}`, { waitUntil: "networkidle" });
+await p.goto(`${SURFACE}/report/${sid}`, { waitUntil: "networkidle" });
 await p.waitForTimeout(700);
 const reachedDrawer = await tabTo("Show the grounding");
 ok("the report's drawers open by keyboard", reachedDrawer);
@@ -465,7 +478,7 @@ const FORBIDDEN = [
 const SWEPT = ["/mastery", "/session", "/session/new", "/session/setup", "/report/" + sid, "/credits", "/settings", "/notebook"];
 if (nbid) SWEPT.push("/notebook/" + nbid);
 for (const route of SWEPT) {
-  await p.goto(BASE + route, { waitUntil: "networkidle" });
+  await p.goto(SURFACE + route, { waitUntil: "networkidle" });
   await p.waitForTimeout(400);
   const text = await p.evaluate(() => document.body.innerText);
   for (const [pattern, why] of FORBIDDEN) {

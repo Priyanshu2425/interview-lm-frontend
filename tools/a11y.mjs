@@ -12,9 +12,9 @@
      BASE=http://127.0.0.1:8100 node tools/a11y.mjs */
 
 import { chromium } from "playwright";
+import { BASE, SURFACE, CONTEXT, requireApi, requireSurface } from "./preflight.mjs";
+import { accessToken, candidateId, signInPage } from "./session.mjs";
 
-const BASE = process.env.BASE || "http://127.0.0.1:8000";
-const CID = "cand_a11y_" + Math.random().toString(36).slice(2, 8);
 
 let pass = 0, fail = 0;
 const ok = (t, cond, detail = "") => {
@@ -25,7 +25,12 @@ const ok = (t, cond, detail = "") => {
 const api = async (path, init = {}) => {
   const r = await fetch(BASE + "/v1" + path, {
     ...init,
-    headers: { "content-type": "application/json", ...(init.headers || {}) },
+    headers: {
+      "content-type": "application/json",
+      /* Identity is Gatehouse's (ADR-0026); the API refuses anything else. */
+      authorization: `Bearer ${TOKEN}`,
+      ...(init.headers || {}),
+    },
     body: init.body ? JSON.stringify(init.body) : undefined,
   });
   return r.json();
@@ -48,16 +53,27 @@ const axTree = async (page, cdp) => {
     }));
 };
 
+await requireApi();
+await requireSurface();
+
+/* Signed in before anything is asked of the API, because everything below it
+   is refused otherwise (ADR-0026). */
+const TOKEN = await accessToken();
+const CID = await candidateId(TOKEN, BASE);
+
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+const ctx = await browser.newContext({ ...CONTEXT,  viewport: { width: 1440, height: 900 } });
 const p = await ctx.newPage();
 
 await api("/credits/grants", {
   method: "POST",
   body: { candidate_id: CID, credits: 90000, payment_ref: "a11y-" + CID },
 });
-await p.goto(BASE + "/mastery", { waitUntil: "domcontentloaded" });
-await p.evaluate((cid) => localStorage.setItem("ilm.candidate.v1", cid), CID);
+await p.goto(SURFACE + "/mastery", { waitUntil: "domcontentloaded" });
+/* Through the form, which is the path a Candidate takes. There is nowhere to
+   inject a token: the surface keeps it in a module variable and rebuilds it
+   from the refresh cookie. */
+await signInPage(p, SURFACE);
 
 const modules = await api(`/skills/modules?track=aiml`);
 const started = await api("/sessions", {
@@ -74,7 +90,7 @@ const sid = started.session_id;
    composer exists in. A pass run after the Session ended would report a screen
    nobody is ever on. */
 console.log("\nThe exchange, as it is announced");
-await p.goto(`${BASE}/examination/${sid}`, { waitUntil: "networkidle" });
+await p.goto(`${SURFACE}/examination/${sid}`, { waitUntil: "networkidle" });
 await p.waitForTimeout(1500);
 
 const cdp = await ctx.newCDPSession(p);
@@ -140,7 +156,7 @@ for (let i = 0; i < 8; i++) {
      carries a score, and the loop stops when the plan or the clock runs out. */
   if (r?.kind === "session_ended" || r?.kind === "session_parked") break;
 }
-await p.goto(BASE + "/mastery", { waitUntil: "networkidle" });
+await p.goto(SURFACE + "/mastery", { waitUntil: "networkidle" });
 await p.waitForTimeout(1200);
 
 const ridges = await p.evaluate(() =>
@@ -160,7 +176,7 @@ if (ridges.length === 0) {
 
 /* ------------------------------------------------------------- the summary -- */
 console.log("\nThe record, as it is announced");
-await p.goto(`${BASE}/report/${sid}`, { waitUntil: "networkidle" });
+await p.goto(`${SURFACE}/report/${sid}`, { waitUntil: "networkidle" });
 await p.waitForTimeout(1000);
 tree = await axTree(p, await ctx.newCDPSession(p));
 
