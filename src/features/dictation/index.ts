@@ -42,3 +42,7 @@ export type {
 } from "./helpers";
 
 export type { Recording, TranscriptionResult } from "./transcriber";
+
+/* Which backend the model ended up on. Exported because `engineLabel` takes
+   one and the setup screen has to render what it returns. */
+export type { Device } from "./whisper/protocol";

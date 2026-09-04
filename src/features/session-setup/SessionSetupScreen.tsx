@@ -97,10 +97,13 @@ export function SessionSetupScreen() {
             moduleCount={moduleIds.length}
             durationSeconds={durationChoice === 0 ? 0 : durationSeconds}
             provider={prefs.provider}
-            starting={start.isPending}
+            /* Nothing is in flight here any more: Begin is a navigation, and
+               the Session starts on the screen it navigates to (ISSUE-0053).
+               A spinner on this button would be a spinner for a route change. */
+            starting={false}
             blocked={blocked}
             onBegin={() =>
-              start.mutate({
+              start.begin({
                 moduleIds,
                 durationSeconds,
                 provider: prefs.provider,

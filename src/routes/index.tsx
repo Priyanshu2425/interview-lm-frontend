@@ -7,6 +7,7 @@ import { SessionsScreen } from "@/features/sessions";
 import { ExaminationScreen } from "@/features/examination";
 import { ReportScreen } from "@/features/report";
 import { RequireOnboarding, WelcomeScreen } from "@/features/onboarding";
+import { InterviewSetupScreen } from "@/features/interview-setup";
 import { NotebookLibraryScreen, NotebookWorkbenchScreen } from "@/features/notebook";
 import { NotFoundScreen } from "./NotFoundScreen";
 import { RouteError } from "./RouteError";
@@ -56,6 +57,14 @@ export const router = createBrowserRouter([
       element: <RequireOnboarding />,
       children: [
     { path: "/welcome", element: <WelcomeScreen /> },
+    /* The three checks before the clock starts (ISSUE-0053). A sibling of
+       `/welcome` and outside `RootLayout` for the same reason it is: a nav rail
+       around a screen you are meant to sit through invites leaving it
+       half-done, and half-done here is a Session started, paid for and
+       abandoned. Not lazy — it is on the critical path of every Session, and a
+       chunk fetch would add a round-trip to the screen that exists to remove
+       waiting. */
+    { path: "/session/setup", element: <InterviewSetupScreen /> },
     {
     path: "/",
     element: <RootLayout />,
