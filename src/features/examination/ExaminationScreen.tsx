@@ -10,6 +10,8 @@ import { queryKeys } from "@/lib/query-keys";
 import { usePreferenceStore } from "@/shared/stores/preferences";
 import { useIsCompact, useReducedMotion } from "@/shared/hooks";
 import { useSessionHistory } from "@/shared/stores/sessionHistory";
+import { useSessionUser } from "@/shared/stores/session";
+import { acquire, release } from "@/features/dictation";
 import { GRADING_MODE_LABEL, GRADING_MODE_WEIGHT } from "@/shared/utils/format";
 import { usePlan } from "@/features/session-plan";
 import { useExamination } from "./hooks/useExamination";
@@ -27,6 +29,26 @@ export function ExaminationScreen() {
 
   const exam = useExamination(sessionId);
   const plan = usePlan(sessionId);
+  const candidateId = useSessionUser() ?? "anonymous";
+
+  /* The engine, held for as long as this Session is on screen.
+   *
+   * `/session/setup` normally acquires it before the clock starts, and
+   * `acquire` is idempotent per Session — so arriving from there costs
+   * nothing. This is for the other way in: a Session resumed straight to
+   * `/examination/:id`, where nothing had ever acquired an engine, the phase
+   * stayed `cold`, and speaking was simply unreachable.
+   *
+   * Released on the way out, which nothing did before. The loaded model
+   * survives it deliberately — `release` gives back the microphone and the
+   * meter and keeps the weights, so somebody who sits two Sessions in one
+   * sitting downloads once. Without this the meter kept a node from an
+   * unmounted tree and the engine stayed held for a Session that had ended. */
+  useEffect(() => {
+    if (!sessionId) return;
+    void acquire(sessionId, candidateId);
+    return () => release(sessionId);
+  }, [sessionId, candidateId]);
   const [confirmEnd, setConfirmEnd] = useState(false);
 
   const compactLabel = useIsCompact();
