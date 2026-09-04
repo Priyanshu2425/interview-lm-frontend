@@ -14,7 +14,7 @@ import { GRADING_MODE_LABEL, GRADING_MODE_WEIGHT } from "@/shared/utils/format";
 import { usePlan } from "@/features/session-plan";
 import { useExamination } from "./hooks/useExamination";
 import { Transcript } from "./components/Transcript";
-import { Composer } from "./components/Composer";
+import { AnswerComposer } from "./components/AnswerComposer";
 import { PlanRail } from "./components/PlanRail";
 import { PlanDots } from "./components/PlanDots";
 import { SessionTimer } from "./components/SessionTimer";
@@ -204,7 +204,7 @@ export function ExaminationScreen() {
         ) : null}
 
         {composerDisabled ? null : (
-          <Composer
+          <AnswerComposer
             disabled={composerDisabled}
             sending={exam.sending}
             onSubmit={exam.submit}
