@@ -57,9 +57,13 @@ const SCREENS = [
   { proto: "08-operator.html", route: "/operator", name: "Operator" },
 ];
 
-/* Deliberately unbuilt (ISSUE-0020, SPEC-0003): these must have no counterpart
-   and must not have crept in. */
-const FUTURE = ["06-code-visit.html", "07-voice-visit.html"];
+/* Deliberately unbuilt (ISSUE-0020, SPEC-0003): this must have no counterpart
+   and must not have crept in.
+   `07-voice-visit.html` was here until ISSUE-0049. Voice is built: the
+   Candidate speaks, the browser transcribes, and the turn reaches the API as
+   text with `spoken: true` (ISSUE-0050, 0052, 0053, 0054). The code editor
+   stays. */
+const FUTURE = ["06-code-visit.html"];
 
 const browser = await chromium.launch();
 let findings = 0;
@@ -144,14 +148,23 @@ for (const width of WIDTHS) {
   await ctx.close();
 }
 
-/* The two that must stay unbuilt. */
+/* The one that must stay unbuilt. */
 {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const p = await ctx.newPage();
   for (const route of ["/session/new", "/credits", "/mastery", "/settings"]) {
     await p.goto(BASE + route, { waitUntil: "networkidle" });
     const text = await p.evaluate(() => document.body.innerText.toLowerCase());
-    for (const word of ["code editor", "voice", "microphone"]) {
+    /* A record of what we refused to build, not a lint. Each word here is a
+       surface somebody could add by momentum, and the check exists so adding
+       it has to be a decision with a diff.
+
+       "voice" and "microphone" left this list in ISSUE-0055, because the thing
+       they guarded got built on purpose — through 0049's design and five
+       slices, which is exactly the deliberate act the check was asking for.
+       "code editor" stays: it is still a surface with no endpoint behind it,
+       and a code box that graded nothing would be worse than its absence. */
+    for (const word of ["code editor"]) {
       if (text.includes(word)) { findings++; console.log(`✗ ${route} offers "${word}" — a future surface has crept in`); }
     }
     const violet = await p.evaluate(() => {
@@ -166,8 +179,8 @@ for (const width of WIDTHS) {
   }
   await ctx.close();
 }
-console.log(FUTURE.length === 2
-  ? "\n✓ screens 06 and 07 remain prototypes with no built counterpart"
+console.log(FUTURE.length === 1
+  ? "\n✓ screen 06 remains a prototype with no built counterpart"
   : "");
 
 await browser.close();

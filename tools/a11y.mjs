@@ -103,6 +103,29 @@ const live = await p.evaluate(() =>
 ok("something announces the reply without the reader hunting for it",
    live.length > 0, JSON.stringify(live));
 
+/* Answering out loud, announced (ISSUE-0049's last criterion, built in
+   ISSUE-0054).
+ 
+   Headless Chromium denies the microphone, so what runs here is the `denied`
+   fallback: the typing composer inline, plus the way back to the microphone.
+   That is the state worth asserting — it is the one a Candidate whose browser
+   refused lands in, and the one where "the Session is still usable" has to be
+   true rather than merely intended. */
+const voice = controls.filter((n) =>
+  /speak|microphone|stop and transcribe|record again|type this answer/i.test(n.name));
+ok("the way to answer out loud announces what it does",
+   voice.length > 0,
+   controls.map((n) => n.name).join(" | "));
+
+/* Not the toast host. `ToastHost` satisfies the check above globally, which
+   means it would satisfy it for a composer that announced nothing at all —
+   so this asks the composer specifically. */
+const composerLive = await p.evaluate(() =>
+  [...document.querySelectorAll(".composer [aria-live], .composer [role=status], .composer [role=alert]")]
+    .map((n) => n.textContent?.trim() || n.getAttribute("role")));
+ok("the composer announces its own state, not only the toast host",
+   composerLive.length > 0, JSON.stringify(composerLive));
+
 /* ------------------------------------------------------------ the ridge ----- */
 /* The Mastery map draws it for every Topic with a reading, and unlike the
    result panel that survives a reload — so this is where it can be checked

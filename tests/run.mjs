@@ -458,7 +458,11 @@ const FORBIDDEN = [
   [/\bfinal score\b/i, "gives a Session one number"],
   [/\bsession (score|grade|result)\b/i, "reads a Session as a single figure"],
 ];
-const SWEPT = ["/mastery", "/session", "/session/new", "/report/" + sid, "/credits", "/settings", "/notebook"];
+/* `/session/setup` is in the sweep like every other route (ISSUE-0055). It
+   redirects to `/session/new` without `location.state`, which is the state a
+   direct visit produces — and a redirect is still a screen a Candidate sees,
+   so it is swept for the same refusals as the rest. */
+const SWEPT = ["/mastery", "/session", "/session/new", "/session/setup", "/report/" + sid, "/credits", "/settings", "/notebook"];
 if (nbid) SWEPT.push("/notebook/" + nbid);
 for (const route of SWEPT) {
   await p.goto(BASE + route, { waitUntil: "networkidle" });

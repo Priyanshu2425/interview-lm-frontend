@@ -209,8 +209,10 @@ node tools/scenes.mjs <out-dir> [variation]  # states a route shot cannot reach
 
 ## Not built
 
-The code editor and voice surfaces are future surfaces with no endpoints,
-deliberately absent so nobody builds them by momentum.
+The code editor is a future surface with no endpoint, deliberately absent so
+nobody builds it by momentum. Voice was that too, until ISSUE-0049: the
+Candidate speaks, the browser transcribes, and the turn reaches the API as text
+with `spoken: true`.
 
 Auth is not built. `shared/stores/identity.ts` carries a candidate id the
 browser generated, and that is the one module that changes when ISSUE-0011
